@@ -41,7 +41,7 @@ if (import.meta.main) {
 
 	// Start server
 	try {
-		await app.listen({ hostname: "0.0.0.0", port: 8000, signal });
+		await app.listen({ hostname: "0.0.0.0", port: 1001, signal });
 	} catch (err) {
 		if (err instanceof Error) {
 			if (err.name === "AbortError") {
