@@ -9,8 +9,10 @@ export const list_boards = async (ctx: Context) => {
         ctx.response.body = { error: "Database error" };
         return;
     }
-    
-    console.log(ctx.state.session);
-    const [boards] = await client.query("SELECT * FROM boards WHERE owner = ?", [ctx.state.session.userId]);
-    ctx.response.body = { boards };
+
+    let boards = await client.query("SELECT * FROM boards WHERE owner = ?", [ctx.state.session.userId]);
+    if (boards === undefined || boards === null) {
+        boards = [];
+    }
+    ctx.response.body = boards;
 };

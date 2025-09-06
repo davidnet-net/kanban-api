@@ -79,6 +79,7 @@ async function ensureDBStructure(client: Client) {
 				owner BIGINT NOT NULL,
 				is_public BOOLEAN DEFAULT FALSE,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				background_url VARCHAR(2048) NOT NULL,
 				FOREIGN KEY (owner) REFERENCES users(user_id) ON DELETE CASCADE
 			)
 		`);
@@ -104,7 +105,7 @@ async function ensureDBStructure(client: Client) {
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				is_archived BOOLEAN DEFAULT FALSE,
 				owner BIGINT NOT NULL,
-				FOREIGN KEY (owner) REFERENCES users(user_id) ON DELETE CASCADE
+				FOREIGN KEY (owner) REFERENCES users(user_id) ON DELETE CASCADE,
 				FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
 			)
 		`);
