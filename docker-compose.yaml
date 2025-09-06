@@ -1,0 +1,54 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./volumes/db_data:/var/lib/mysql
+      - ./mysql_init.sh:/docker-entrypoint-initdb.d/mysql_init.sh
+    networks:
+      - test-network
+
+  api:
+    build: api
+    environment:
+      # Env starting with (DENO ALLOWED) DA_ deno can access.
+      DA_DB_USER: ${MYSQL_USER}
+      DA_DB_PASS: ${MYSQL_PASSWORD}
+      DA_DB_NAME: ${MYSQL_DATABASE}
+      DA_DB_HOST: db
+      DA_LOG_DIR: ${LOG_DIR}
+      DA_KEEP_LOG_DAYS: ${KEEP_LOG_DAYS}
+      DA_LOG_TO_TERMINAL: ${LOG_TO_TERMINAL}
+      DA_EMAIL: ${EMAIL}
+      DA_EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+    ports:
+      - "3000:8000"
+    volumes:
+      - ./volumes/logs:/app/logs
+    depends_on:
+      - db
+    networks:
+      - test-network
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "curl -v -f http://localhost:8000/health/docker || exit 1",
+      ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  db_data:
+  logs:
+
+networks:
+  test-network:
+    driver: bridge

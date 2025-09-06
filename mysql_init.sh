@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<-EOSQL
+  ALTER USER '${MYSQL_USER}'@'%' IDENTIFIED WITH mysql_native_password BY '${MYSQL_PASSWORD}';
+  GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';
+  FLUSH PRIVILEGES;
+EOSQL
