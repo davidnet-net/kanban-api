@@ -4,168 +4,93 @@ import { verifyJWT } from "../lib/jwt.ts";
 
 export const get_board = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
-
     const id = Number(body.id);
-    if (isNaN(id) || id <= 0) {
-        ctx.response.status = 400;
-        ctx.response.body = { error: "Invalid board id. Must be a number > 0." };
-        return;
-    }
+    if (isNaN(id) || id <= 0) return ctx.throw(400, "Invalid board id");
 
     const client = await getDBClient();
-    if (!client) {
-        ctx.response.status = 500;
-        ctx.response.body = { error: "Database error" };
-        return;
-    }
+    if (!client) return ctx.throw(500, "DB error");
 
     const result = await client.query("SELECT * FROM boards WHERE id = ?", [id]);
     const board = result[0];
-    if (!board) {
-        ctx.response.status = 404;
-        ctx.response.body = { error: "Board not found" };
-        return;
-    }
+    if (!board) return ctx.throw(404, "Board not found");
 
-    // Public board
     if (board.is_public) {
         ctx.response.body = board;
         return;
     }
 
-    // Check Authorization header
     const authHeader = ctx.request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-        ctx.response.status = 401;
-        ctx.response.body = { error: "Unauthorized" };
-        return;
-    }
+    if (!authHeader?.startsWith("Bearer ")) return ctx.throw(401, "Unauthorized");
 
     let payload;
     try {
-        const token = authHeader.slice(7);
-        console.log(token);
-        payload = await verifyJWT(token);
+        payload = await verifyJWT(authHeader.slice(7));
     } catch {
-        ctx.response.status = 401;
-        ctx.response.body = { error: "Invalid token" };
-        return;
+        return ctx.throw(401, "Invalid token");
     }
 
     const userId = payload.userId;
-
-    // Owner check
     if (board.owner === userId) {
         ctx.response.body = board;
         return;
     }
 
-    // Membership check
-    const membershipResult = await client.query(
+    const membership = await client.query(
         "SELECT * FROM board_members WHERE board_id = ? AND user_id = ?",
         [id, userId]
     );
 
-    if (membershipResult.rows.length === 0) {
-        ctx.response.status = 403;
-        ctx.response.body = { error: "Forbidden: You are not a member of this board" };
-        return;
-    }
-
+    if (membership.length === 0) return ctx.throw(403, "Forbidden");
     ctx.response.body = board;
 };
 
 export const am_i_member = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
-
     const id = Number(body.id);
-    if (isNaN(id) || id <= 0) {
-        ctx.response.status = 400;
-        ctx.response.body = { result: false, error: "Invalid board id. Must be a number > 0." };
-        return;
-    }
+    if (isNaN(id) || id <= 0) return ctx.throw(400, "Invalid board id");
 
     const authHeader = ctx.request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-        ctx.response.status = 401;
-        ctx.response.body = { result: false, error: "Unauthorized" };
-        return;
-    }
+    if (!authHeader?.startsWith("Bearer ")) return ctx.throw(401, "Unauthorized");
 
     let payload;
     try {
-        const token = authHeader.slice(7);
-        payload = await verifyJWT(token);
+        payload = await verifyJWT(authHeader.slice(7));
     } catch {
-        ctx.response.status = 401;
-        ctx.response.body = { result: false, error: "Invalid token" };
-        return;
+        return ctx.throw(401, "Invalid token");
     }
 
     const userId = payload.userId;
-
     const client = await getDBClient();
-    if (!client) {
-        ctx.response.status = 500;
-        ctx.response.body = { result: false, error: "Database error" };
-        return;
-    }
+    if (!client) return ctx.throw(500, "DB error");
 
-    // Check if board exists and get owner
     const boardResult = await client.query("SELECT owner FROM boards WHERE id = ?", [id]);
     const board = boardResult[0];
-    if (!board) {
-        ctx.response.status = 404;
-        ctx.response.body = { result: false, error: "Board not found" };
-        return;
-    }
+    if (!board) return ctx.throw(404, "Board not found");
 
-    // Owner check
     if (board.owner === userId) {
         ctx.response.body = { result: true };
         return;
     }
 
-    // Membership check
     const membershipResult = await client.query(
         "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
         [id, userId]
     );
 
-    if (membershipResult.length > 0) {
-        ctx.response.body = { result: true };
-    } else {
-        ctx.response.body = { result: false };
-    }
+    ctx.response.body = { result: membershipResult.length > 0 };
 };
 
 export const create_board = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
-
     const name = body.name?.trim();
     const isPublic = Boolean(body.is_public);
     const backgroundUrl = body.background_url?.trim();
 
-    if (!name || name.length === 0) {
-        ctx.response.status = 400;
-        ctx.response.body = { error: "Board name is required" };
-        return;
-    }
-
-    if (!backgroundUrl || backgroundUrl.length === 0) {
-        ctx.response.status = 400;
-        ctx.response.body = { error: "Background URL is required" };
-        return;
-    }
+    if (!name || !backgroundUrl) return ctx.throw(400, "Name and background URL required");
 
     const userId = ctx.state.session.userId;
-
     const client = await getDBClient();
-    if (!client) {
-        ctx.response.status = 500;
-        ctx.response.body = { error: "Database error" };
-        return;
-    }
+    if (!client) return ctx.throw(500, "DB error");
 
     try {
         const result = await client.execute(
@@ -174,8 +99,6 @@ export const create_board = async (ctx: Context) => {
         );
 
         const newBoardId = result.lastInsertId;
-
-        // Optionally, add the owner to the board_members table as 'owner'
         await client.execute(
             "INSERT INTO board_members (user_id, board_id, role) VALUES (?, ?, 'owner')",
             [userId, newBoardId]
@@ -190,8 +113,85 @@ export const create_board = async (ctx: Context) => {
             background_url: backgroundUrl
         };
     } catch (err) {
-        console.error("Failed to create board:", err);
-        ctx.response.status = 500;
-        ctx.response.body = { error: "Failed to create board" };
+        console.error(err);
+        ctx.throw(500, "Failed to create board");
     }
+};
+
+export const get_lists = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const boardId = Number(body.board_id);
+    if (isNaN(boardId) || boardId <= 0) return ctx.throw(400, "Invalid board id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [boardId]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    if (!board.is_public) {
+        const authHeader = ctx.request.headers.get("authorization");
+        if (!authHeader?.startsWith("Bearer ")) return ctx.throw(401, "Unauthorized");
+
+        let payload;
+        try {
+            payload = await verifyJWT(authHeader.slice(7));
+        } catch {
+            return ctx.throw(401, "Invalid token");
+        }
+
+        const userId = payload.userId;
+        if (board.owner !== userId) {
+            const membership = await client.query(
+                "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+                [boardId, userId]
+            );
+            if (membership.length === 0) return ctx.throw(403, "Forbidden");
+        }
+    }
+
+    const lists = await client.query("SELECT * FROM lists WHERE board_id = ? ORDER BY position ASC", [boardId]);
+    ctx.response.body = lists;
+};
+
+export const get_cards = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const listId = Number(body.list_id);
+    if (isNaN(listId) || listId <= 0) return ctx.throw(400, "Invalid list id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    const listResult = await client.query("SELECT board_id FROM lists WHERE id = ?", [listId]);
+    const list = listResult[0];
+    if (!list) return ctx.throw(404, "List not found");
+
+    const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [list.board_id]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    if (!board.is_public) {
+        const authHeader = ctx.request.headers.get("authorization");
+        if (!authHeader?.startsWith("Bearer ")) return ctx.throw(401, "Unauthorized");
+
+        let payload;
+        try {
+            payload = await verifyJWT(authHeader.slice(7));
+        } catch {
+            return ctx.throw(401, "Invalid token");
+        }
+
+        const userId = payload.userId;
+        if (board.owner !== userId) {
+            const membership = await client.query(
+                "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+                [board.id, userId]
+            );
+            if (membership.length === 0) return ctx.throw(403, "Forbidden");
+        }
+    }
+
+    const cards = await client.query("SELECT * FROM cards WHERE list_id = ? ORDER BY created_at ASC", [listId]);
+    ctx.response.body = cards;
 };
