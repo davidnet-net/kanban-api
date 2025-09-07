@@ -53,3 +53,63 @@ export const add_card = async (ctx: Context) => {
         ctx.throw(500, "Failed to create card");
     }
 };
+
+export const move_card = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const cardId = Number(body.card_id);
+    const newListId = Number(body.list_id);
+    const newPosition = Number(body.position);
+
+    if (isNaN(cardId) || cardId <= 0) return ctx.throw(400, "Invalid card id");
+    if (isNaN(newListId) || newListId <= 0) return ctx.throw(400, "Invalid list id");
+    if (isNaN(newPosition) || newPosition < 0) return ctx.throw(400, "Invalid position");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Fetch the card
+    const cardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
+    const card = cardResult[0];
+    if (!card) return ctx.throw(404, "Card not found");
+
+    // Fetch the new list
+    const listResult = await client.query("SELECT board_id FROM lists WHERE id = ?", [newListId]);
+    const list = listResult[0];
+    if (!list) return ctx.throw(404, "List not found");
+
+    // Fetch the board
+    const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [list.board_id]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    // Authorization: owner or member
+    const userId = ctx.state.session.userId;
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [board.id, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    try {
+        // Shift positions in target list to make room
+        await client.execute(
+            "UPDATE cards SET position = position + 1 WHERE list_id = ? AND position >= ?",
+            [newListId, newPosition]
+        );
+
+        // Move the card
+        await client.execute(
+            "UPDATE cards SET list_id = ?, position = ? WHERE id = ?",
+            [newListId, newPosition, cardId]
+        );
+
+        // Return updated card
+        const updatedCardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
+        ctx.response.body = updatedCardResult[0];
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to move card");
+    }
+};
