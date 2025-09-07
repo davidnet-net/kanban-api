@@ -186,13 +186,79 @@ export const favorite_board = async (ctx: Context) => {
     if (!board) return ctx.throw(404, "Board not found");
 
     try {
+        const result = await client.query(
+            "SELECT 1 FROM favorite_boards WHERE user_id = ? AND board_id = ? LIMIT 1",
+            [ctx.state.session.userId, board_id]
+        );
+
+        if (result.length > 1) {
+            ctx.response.status = 400;
+            ctx.response.body = { error: "Already favorited" }
+            return;
+        }
+
         await client.execute(
             "INSERT INTO favorite_boards (user_id, board_id) VALUES (?, ?)",
             [ctx.state.session.userId, board_id]
         );
         ctx.response.status = 201;
+        ctx.response.body = { ok: true }
     } catch (err) {
         console.error(err);
         ctx.throw(500, "Failed to create favorite");
+    }
+};
+
+
+export const unfavorite_board = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const board_id = Number(body.board_id);
+
+    if (isNaN(board_id) || board_id <= 0) return ctx.throw(400, "Invalid board id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Check if board exists
+    const boards = await client.query("SELECT id FROM boards WHERE id = ?", [board_id]);
+    const board = boards[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    try {
+        await client.execute(
+            "DELETE FROM favorite_boards WHERE user_id = ? AND board_id = ?",
+            [ctx.state.session.userId, board_id]
+        );
+
+
+        ctx.response.status = 200;
+        ctx.response.body = { ok: true }
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to remove favorite");
+    }
+};
+
+
+export const is_favorited = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const board_id = Number(body.board_id);
+
+    if (isNaN(board_id) || board_id <= 0) return ctx.throw(400, "Invalid board id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    try {
+        const result = await client.query(
+            "SELECT 1 FROM favorite_boards WHERE user_id = ? AND board_id = ? LIMIT 1",
+            [ctx.state.session.userId, board_id]
+        );
+
+        ctx.response.status = 200;
+        ctx.response.body = { favorited: result.length > 0 };
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to check favorite");
     }
 };
