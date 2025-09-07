@@ -66,8 +66,7 @@ async function ensureDBStructure(client: Client) {
 		await client.execute(`
 			CREATE TABLE IF NOT EXISTS users (
 				id BIGINT PRIMARY KEY AUTO_INCREMENT,
-				user_id BIGINT NOT NULL UNIQUE,
-				deleted BOOLEAN DEFAULT FALSE
+				user_id BIGINT NOT NULL UNIQUE
 			)
 		`);
 
@@ -101,10 +100,11 @@ async function ensureDBStructure(client: Client) {
 			CREATE TABLE IF NOT EXISTS cards (
 				id BIGINT PRIMARY KEY AUTO_INCREMENT,
 				list_id BIGINT NOT NULL,
-				name VARCHAR(50) NOT NULL UNIQUE,
+				name VARCHAR(100) NOT NULL,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				is_archived BOOLEAN DEFAULT FALSE,
 				owner BIGINT NOT NULL,
+				position INT NOT NULL,
 				FOREIGN KEY (owner) REFERENCES users(user_id) ON DELETE CASCADE,
 				FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
 			)
