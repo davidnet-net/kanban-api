@@ -14,11 +14,13 @@ export const get_board = async (ctx: Context) => {
     const board = result[0];
     if (!board) return ctx.throw(404, "Board not found");
 
-    const authHeader = ctx.request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) return ctx.throw(401, "Unauthorized");
-
+    console.log("Public: " + board.is_public);
     let payload;
     try {
+        const authHeader = ctx.request.headers.get("authorization");
+        console.log(authHeader);
+        if (!authHeader?.startsWith("Bearer ")) return ctx.throw(401, "Unauthorized");
+
         payload = await verifyJWT(authHeader.slice(7));
     } catch {
         if (board.is_public) {
@@ -56,6 +58,7 @@ export const get_board = async (ctx: Context) => {
         [id, userId]
     );
 
+    console.log("Test")
     if (membership.length === 0) return ctx.throw(403, "Forbidden");
     ctx.response.body = board;
 };
@@ -260,5 +263,33 @@ export const is_favorited = async (ctx: Context) => {
     } catch (err) {
         console.error(err);
         ctx.throw(500, "Failed to check favorite");
+    }
+};
+
+export const delete_board = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const boardId = Number(body.board_id);
+
+    if (isNaN(boardId) || boardId <= 0) return ctx.throw(400, "Invalid board id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Get board and verify ownership
+    const boardResult = await client.query("SELECT owner FROM boards WHERE id = ?", [boardId]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    const userId = ctx.state.session.userId;
+    if (board.owner !== userId) return ctx.throw(403, "Only the owner can delete this board");
+
+    try {
+        await client.execute("DELETE FROM boards WHERE id = ?", [boardId]);
+
+        ctx.response.status = 200;
+        ctx.response.body = { ok: true, message: "Board deleted successfully" };
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to delete board");
     }
 };
