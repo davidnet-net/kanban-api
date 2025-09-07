@@ -1,5 +1,5 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
-import { create_board, delete_board, favorite_board, get_board, get_lists, is_favorited, unfavorite_board } from "../controllers/board.ts";
+import { am_i_member, create_board, delete_board, edit_board, favorite_board, get_board, get_lists, is_favorited, unfavorite_board } from "../controllers/board.ts";
 import auth from "../middlewares/auth.ts";
 
 
@@ -13,5 +13,7 @@ router
     .post("/lists", get_lists)
     .post("/is_favorited", auth, is_favorited)
     .post("/delete", auth, delete_board)
-
+    .post("/am_i_member", auth, am_i_member)
+    .post("/edit", auth, edit_board)
+    
 export default router;

@@ -293,3 +293,39 @@ export const delete_board = async (ctx: Context) => {
         ctx.throw(500, "Failed to delete board");
     }
 };
+
+export const edit_board = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const boardId = Number(body.board_id);
+    const name = body.name?.trim();
+    const isPublic = Boolean(body.is_public);
+
+    if (isNaN(boardId) || boardId <= 0) return ctx.throw(400, "Invalid board id");
+    if (!name || name.length > 20 || /[^a-zA-Z0-9 ]/.test(name)) {
+        return ctx.throw(400, "Invalid board name");
+    }
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Get board and verify ownership
+    const boardResult = await client.query("SELECT owner FROM boards WHERE id = ?", [boardId]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    const userId = ctx.state.session.userId;
+    if (board.owner !== userId) return ctx.throw(403, "Only the owner can edit this board");
+
+    try {
+        await client.execute(
+            "UPDATE boards SET name = ?, is_public = ? WHERE id = ?",
+            [name, isPublic ? 1 : 0, boardId]
+        );
+
+        ctx.response.status = 200;
+        ctx.response.body = { ok: true, id: boardId, name, is_public: isPublic };
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to update board");
+    }
+};

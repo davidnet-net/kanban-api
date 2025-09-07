@@ -156,3 +156,53 @@ export const move_list = async (ctx: Context) => {
         ctx.throw(500, "Failed to reorder lists");
     }
 };
+
+/**
+ * Deletes a list from a board.
+ * Only the board owner or members can delete lists.
+ * Body: { board_id: number, list_id: number }
+ */
+export const delete_list = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const boardId = Number(body.board_id);
+    const listId = Number(body.list_id);
+
+    if (isNaN(boardId) || boardId <= 0) return ctx.throw(400, "Invalid board id");
+    if (isNaN(listId) || listId <= 0) return ctx.throw(400, "Invalid list id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Check board existence
+    const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [boardId]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    // Authorization: must be owner or member
+    const userId = ctx.state.session.userId;
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [board.id, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    // Check if list belongs to this board
+    const listResult = await client.query("SELECT * FROM lists WHERE id = ? AND board_id = ?", [
+        listId,
+        boardId,
+    ]);
+    const list = listResult[0];
+    if (!list) return ctx.throw(404, "List not found in this board");
+
+    try {
+        await client.execute("DELETE FROM lists WHERE id = ? AND board_id = ?", [listId, boardId]);
+
+        ctx.response.status = 200;
+        ctx.response.body = { message: "List deleted successfully" };
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to delete list");
+    }
+};
