@@ -8,6 +8,7 @@ const router = new Router();
 router
     .post("/get", get_board)
     .post("/create", auth, create_board)
+    .post("/favorite", auth, get_lists)
     .post("/lists", get_lists)
 
 export default router;

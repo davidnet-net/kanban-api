@@ -6,7 +6,7 @@ export const requestLogger: Middleware = async (ctx: Context, next) => {
 	await next();
 	const ms = Date.now() - start;
 	log(
-		`${ctx.request.method} - ${ctx.request.url} - ${ctx.state.correlationID} - ${ms}ms`,
+		`${ctx.request.method} - ${ctx.response.status} - ${ctx.request.url} - ${ctx.state.correlationID} - ${ms}ms`,
 	);
 };
 

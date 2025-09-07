@@ -14,11 +14,6 @@ export const get_board = async (ctx: Context) => {
     const board = result[0];
     if (!board) return ctx.throw(404, "Board not found");
 
-    if (board.is_public) {
-        ctx.response.body = board;
-        return;
-    }
-
     const authHeader = ctx.request.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) return ctx.throw(401, "Unauthorized");
 
@@ -26,7 +21,28 @@ export const get_board = async (ctx: Context) => {
     try {
         payload = await verifyJWT(authHeader.slice(7));
     } catch {
-        return ctx.throw(401, "Invalid token");
+        if (board.is_public) {
+            ctx.response.body = board;
+            return;
+        } else {
+            return ctx.throw(401, "Invalid token");
+        }
+    }
+
+    try {
+        await client.execute(
+            "INSERT INTO recent_boards (user_id, board_id) VALUES (?, ?)",
+            [payload.userId, id]
+        );
+        ctx.response.status = 201;
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to create card");
+    }
+
+    if (board.is_public) {
+        ctx.response.body = board;
+        return;
     }
 
     const userId = payload.userId;
@@ -105,7 +121,7 @@ export const create_board = async (ctx: Context) => {
         );
 
         ctx.response.status = 201;
-        ctx.response.body = { 
+        ctx.response.body = {
             id: newBoardId,
             name,
             owner: userId,
@@ -155,3 +171,28 @@ export const get_lists = async (ctx: Context) => {
     ctx.response.body = lists;
 };
 
+export const favorite_board = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const board_id = Number(body.board_id);
+
+    if (isNaN(board_id) || board_id <= 0) return ctx.throw(400, "Invalid list id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Check list exists
+    const boards = await client.query("SELECT id FROM boards WHERE id = ?", [board_id]);
+    const board = boards[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    try {
+        await client.execute(
+            "INSERT INTO favorite_boards (user_id, board_id) VALUES (?, ?)",
+            [ctx.state.session.userId, board_id]
+        );
+        ctx.response.status = 201;
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to create favorite");
+    }
+};

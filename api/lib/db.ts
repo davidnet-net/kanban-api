@@ -180,6 +180,29 @@ async function ensureDBStructure(client: Client) {
 			)
 		`);
 
+		// cards
+		await client.execute(`
+			CREATE TABLE IF NOT EXISTS favorite_boards (
+				id BIGINT PRIMARY KEY AUTO_INCREMENT,
+				user_id BIGINT NOT NULL,
+				board_id BIGINT NOT NULL,
+				FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+			)
+		`);
+
+		// cards
+		await client.execute(`
+			CREATE TABLE IF NOT EXISTS recent_boards (
+				id BIGINT PRIMARY KEY AUTO_INCREMENT,
+				user_id BIGINT NOT NULL,
+				board_id BIGINT NOT NULL,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+			)
+		`);
+
 		log("Ensured DB Structure.");
 		return true;
 	} catch (err) {
