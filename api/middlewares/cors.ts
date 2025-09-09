@@ -25,11 +25,29 @@ function isInternalIP(ip: string) {
 }
 
 export const cors: Middleware = async (ctx, next) => {
-  const origin = ctx.request.headers.get("origin")?.trim();
-  const clientIP = ctx.request.ip;
+  const origin = ctx.request.headers.get("origin")?.trim() || "*";
+  const clientIP = ctx.request.ip; // if behind a proxy, consider x-forwarded-for
 
-  // Allow all internal IPs and server's external IP
-  if (serverExternalIP && clientIP === serverExternalIP || isInternalIP(clientIP)) {
+  // Always set CORS headers first so OPTIONS preflight works
+  ctx.response.headers.set("Access-Control-Allow-Origin", origin);
+  ctx.response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,DELETE,OPTIONS"
+  );
+  ctx.response.headers.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, x-correlation-id"
+  );
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+
+  // Respond immediately for OPTIONS requests
+  if (ctx.request.method === "OPTIONS") {
+    ctx.response.status = 204;
+    return;
+  }
+
+  // Allow internal IPs and server's external IP
+  if ((serverExternalIP && clientIP === serverExternalIP) || isInternalIP(clientIP)) {
     await next();
     return;
   }
@@ -37,7 +55,6 @@ export const cors: Middleware = async (ctx, next) => {
   if (!origin) {
     log("Denied: ", clientIP, " no cors origin.");
     ctx.response.status = 403;
-    ctx.response.headers.set("Access-Control-Allow-Origin", "*");
     ctx.response.body = "CORS origin header is required!";
     return;
   }
@@ -56,7 +73,6 @@ export const cors: Middleware = async (ctx, next) => {
     }
   } catch {
     ctx.response.status = 400;
-    ctx.response.headers.set("Access-Control-Allow-Origin", "*");
     ctx.response.body = "CORS origin header is invalid!";
     return;
   }
@@ -64,24 +80,7 @@ export const cors: Middleware = async (ctx, next) => {
   if (!allow) {
     log("Denied: ", clientIP, " not allowed.");
     ctx.response.status = 403;
-    ctx.response.headers.set("Access-Control-Allow-Origin", "*");
     ctx.response.body = "Not allowed!";
-    return;
-  }
-
-  ctx.response.headers.set("Access-Control-Allow-Origin", origin);
-  ctx.response.headers.set(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PUT,DELETE,OPTIONS"
-  );
-  ctx.response.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, x-correlation-id"
-  );
-  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
-
-  if (ctx.request.method === "OPTIONS") {
-    ctx.response.status = 204;
     return;
   }
 
