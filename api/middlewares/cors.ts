@@ -7,7 +7,7 @@ const allowedHostRegex = /^([a-z0-9-]+\.)*davidnet\.net$/i;
 export const serverExternalIP = await (async () => {
   try {
     const res = await fetch("https://api.ipify.org?format=text");
-    return res.text();
+    return (await res.text()).trim();
   } catch {
     return null;
   }
@@ -15,6 +15,13 @@ export const serverExternalIP = await (async () => {
 
 export const cors: Middleware = async (ctx, next) => {
   const origin = ctx.request.headers.get("origin")?.trim();
+  const clientIP = ctx.request.ip;
+
+  // Allow all if client IP matches server's external IP
+  if (serverExternalIP && clientIP === serverExternalIP) {
+    await next();
+    return;
+  }
 
   if (!origin) {
     ctx.response.status = 403;
@@ -29,7 +36,7 @@ export const cors: Middleware = async (ctx, next) => {
     const url = new URL(origin);
     const host = url.hostname;
 
-    // Check domain match
+    // Check domain match (allowed host or not in prod)
     if (!DA_ISPROD || allowedHostRegex.test(host)) {
       allow = true;
     } else if (serverExternalIP) {
