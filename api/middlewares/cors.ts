@@ -14,18 +14,28 @@ export const serverExternalIP = await (async () => {
   }
 })();
 
+// Utility to check if an IP is internal
+function isInternalIP(ip: string) {
+  return (
+    ip === "127.0.0.1" ||
+    ip.startsWith("10.") ||
+    ip.startsWith("192.168.") ||
+    (/^172\.(1[6-9]|2\d|3[0-1])\./).test(ip)
+  );
+}
+
 export const cors: Middleware = async (ctx, next) => {
   const origin = ctx.request.headers.get("origin")?.trim();
   const clientIP = ctx.request.ip;
 
-  // Allow all if client IP matches server's external IP
-  if (serverExternalIP && clientIP === serverExternalIP || clientIP === "127.0.0.1") {
+  // Allow all internal IPs and server's external IP
+  if (serverExternalIP && clientIP === serverExternalIP || isInternalIP(clientIP)) {
     await next();
     return;
   }
 
   if (!origin) {
-    log("Denied: ", clientIP, " no cors orgin.");
+    log("Denied: ", clientIP, " no cors origin.");
     ctx.response.status = 403;
     ctx.response.headers.set("Access-Control-Allow-Origin", "*");
     ctx.response.body = "CORS origin header is required!";
@@ -38,12 +48,10 @@ export const cors: Middleware = async (ctx, next) => {
     const url = new URL(origin);
     const host = url.hostname;
 
-    // Check domain match (allowed host or not in prod)
     if (!DA_ISPROD || allowedHostRegex.test(host)) {
       allow = true;
     } else if (serverExternalIP) {
-      // Resolve host to IP and check if it matches server's external IP
-      const ips = await Deno.resolveDns(host, "A"); // IPv4 only
+      const ips = await Deno.resolveDns(host, "A");
       if (ips.includes(serverExternalIP)) allow = true;
     }
   } catch {
@@ -61,7 +69,6 @@ export const cors: Middleware = async (ctx, next) => {
     return;
   }
 
-  // Set CORS headers
   ctx.response.headers.set("Access-Control-Allow-Origin", origin);
   ctx.response.headers.set(
     "Access-Control-Allow-Methods",
