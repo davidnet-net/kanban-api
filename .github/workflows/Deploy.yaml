@@ -48,9 +48,9 @@ jobs:
             fi
 
             echo "Building updated containers..."
-            docker compose build --pull
+            docker compose build --pull --no-cache
 
             echo "Recreating services..."
-            docker compose up -d
+            docker compose up -d --remove-orphans
 
             echo "Deployment finished successfully!"
