@@ -19,7 +19,7 @@ export const cors: Middleware = async (ctx, next) => {
   const clientIP = ctx.request.ip;
 
   // Allow all if client IP matches server's external IP
-  if (serverExternalIP && clientIP === serverExternalIP) {
+  if (serverExternalIP && clientIP === serverExternalIP || clientIP === "127.0.0.1") {
     await next();
     return;
   }
