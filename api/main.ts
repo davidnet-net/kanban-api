@@ -5,6 +5,7 @@ import correlationID from "./middlewares/correlationID.ts";
 import errorHandler from "./middlewares/errorHandler.ts";
 import requestLogger from "./middlewares/requestLogger.ts";
 import envCheck from "./lib/envCheck.ts";
+import cors from "./middlewares/cors.ts";
 
 if (import.meta.main) {
 	// Check if .env & config.ts are valid.
@@ -16,6 +17,7 @@ if (import.meta.main) {
 	const app = new Application();
 
 	// Global middlewares
+	app.use(cors);
 	app.use(correlationID);
 	app.use(errorHandler);
 	app.use(requestLogger);
