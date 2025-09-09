@@ -4,7 +4,7 @@ const DA_ISPROD = Deno.env.get("DA_ISPROD") === "true";
 const allowedHostRegex = /^([a-z0-9-]+\.)*davidnet\.net$/i;
 
 // Fetch your server's external IP once at startup
-const serverExternalIP = await (async () => {
+export const serverExternalIP = await (async () => {
   try {
     const res = await fetch("https://api.ipify.org?format=text");
     return res.text();
