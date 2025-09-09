@@ -1,4 +1,5 @@
 import { Middleware } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { log } from "../lib/logger.ts";
 
 const DA_ISPROD = Deno.env.get("DA_ISPROD") === "true";
 const allowedHostRegex = /^([a-z0-9-]+\.)*davidnet\.net$/i;
@@ -24,6 +25,7 @@ export const cors: Middleware = async (ctx, next) => {
   }
 
   if (!origin) {
+    log("Denied: ", clientIP, " no cors orgin.");
     ctx.response.status = 403;
     ctx.response.headers.set("Access-Control-Allow-Origin", "*");
     ctx.response.body = "CORS origin header is required!";
@@ -52,6 +54,7 @@ export const cors: Middleware = async (ctx, next) => {
   }
 
   if (!allow) {
+    log("Denied: ", clientIP, " not allowed.");
     ctx.response.status = 403;
     ctx.response.headers.set("Access-Control-Allow-Origin", "*");
     ctx.response.body = "Not allowed!";
