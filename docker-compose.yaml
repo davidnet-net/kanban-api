@@ -30,6 +30,9 @@ services:
       - "1001:1001"
     volumes:
       - ./volumes/logs:/app/logs
+    dns:
+      - 192.168.1.141
+      - 1.1.1.1
     depends_on:
       - db
     networks:
