@@ -4,6 +4,7 @@ import { log, log_error } from "./logger.ts";
 let dbClient: Client | null = null;
 let initialConnectionSucceeded = false;
 export const DBVersion = 1; //? Used for export version etc
+const DA_ISPROD = Deno.env.get("DA_ISPROD") === "true";
 
 async function connectToDB(): Promise<Client | null> {
 	try {
@@ -202,6 +203,14 @@ async function ensureDBStructure(client: Client) {
 				FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 			)
 		`);
+
+		if (!DA_ISPROD) {
+			await client.execute(
+				"INSERT INTO users (user_id) VALUES (?)",
+				[1]
+			);
+			log("Created dev user!");
+		}
 
 		log("Ensured DB Structure.");
 		return true;
