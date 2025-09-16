@@ -47,7 +47,7 @@ export const cors: Middleware = async (ctx, next) => {
   }
 
   // Allow internal IPs and server's external IP
-  if ((serverExternalIP && clientIP === serverExternalIP) || isInternalIP(clientIP)) {
+  if ((serverExternalIP && clientIP === serverExternalIP) || isInternalIP(clientIP) || !DA_ISPROD) {
     await next();
     return;
   }
