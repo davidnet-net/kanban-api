@@ -205,12 +205,19 @@ async function ensureDBStructure(client: Client) {
 		`);
 
 		if (!DA_ISPROD) {
-			await client.execute(
-				"INSERT INTO users (user_id) VALUES (?)",
+			const result = await client.execute(
+				"INSERT IGNORE INTO users (user_id) VALUES (?)",
 				[1]
 			);
-			log("Created dev user!");
+			if (result.affectedRows && result.affectedRows > 0) {
+				log("Created dev user!");
+			} else {
+				log("Dev user already existed.");
+			}
+			log("Handled dev user.")
 		}
+
+
 
 		log("Ensured DB Structure.");
 		return true;
