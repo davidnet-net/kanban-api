@@ -12,7 +12,11 @@ export const get_board = async (ctx: Context) => {
 
     const result = await client.query("SELECT * FROM boards WHERE id = ?", [id]);
     const board = result[0];
-    if (!board) return ctx.throw(404, "Board not found");
+    if (!board) {
+        ctx.response.status = 404;
+        ctx.response.body = { "error": "Board not found" }
+        return;
+    }
 
     console.log("Public: " + board.is_public);
     let payload;
@@ -58,8 +62,11 @@ export const get_board = async (ctx: Context) => {
         [id, userId]
     );
 
-    console.log("Test")
-    if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    if (membership.length === 0) {
+        ctx.response.status = 403;
+        ctx.response.body = { "error": "Not board member" }
+        return;
+    }
     ctx.response.body = board;
 };
 
