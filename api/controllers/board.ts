@@ -14,7 +14,7 @@ export const get_board = async (ctx: Context) => {
     const board = result[0];
     if (!board) {
         ctx.response.status = 404;
-        ctx.response.body = { "error": "Board not found" }
+        ctx.response.body = { error: "Board not found" }
         return;
     }
 
@@ -64,7 +64,7 @@ export const get_board = async (ctx: Context) => {
 
     if (membership.length === 0) {
         ctx.response.status = 403;
-        ctx.response.body = { "error": "Not board member" }
+        ctx.response.body = { error: "Not board member" }
         return;
     }
     ctx.response.body = board;
