@@ -6,30 +6,33 @@ export const sseRouter = new Router();
 
 // Client subscribes to a board
 sseRouter.get("/:boardId", (ctx: RouterContext<"/:boardId">) => {
-  const boardId = ctx.params.boardId;
-  if (!boardId) return ctx.throw(400, "Board ID missing");
+    const boardId = ctx.params.boardId;
+    if (!boardId) return ctx.throw(400, "Board ID missing");
 
-  if (!boardClients.has(boardId)) boardClients.set(boardId, new Set());
-  const target = ctx.sendEvents();
-  const clients = boardClients.get(boardId)!;
-  clients.add(target);
+    // Set SSE headers explicitly
+    ctx.response.headers.set("Content-Type", "text/event-stream");
+    ctx.response.headers.set("Cache-Control", "no-cache");
+    ctx.response.headers.set("Connection", "keep-alive");
 
-  console.log(`Client connected to board ${boardId}. Total: ${clients.size}`);
+    if (!boardClients.has(boardId)) boardClients.set(boardId, new Set());
+    const target = ctx.sendEvents();
+    const clients = boardClients.get(boardId)!;
+    clients.add(target);
 
-  target.addEventListener("close", () => {
-    clients.delete(target);
-    console.log(`Client disconnected from board ${boardId}. Total: ${clients.size}`);
-  });
+    console.log(`Client connected to board ${boardId}. Total: ${clients.size}`);
 
-  target.dispatchMessage({ message: `Connected to board ${boardId}` });
+    target.addEventListener("close", () => {
+        clients.delete(target);
+        console.log(`Client disconnected from board ${boardId}. Total: ${clients.size}`);
+    });
 });
 
 export function broadcastBoardUpdate(boardId: string, payload: any) {
-  const clients = boardClients.get(boardId);
-  if (!clients) return;
-  console.log("Broadcasting SSE payload:", payload);
-  const event = new ServerSentEvent("update", payload);
-  for (const client of clients) client.dispatchEvent(event);
+    const clients = boardClients.get(boardId);
+    if (!clients) return;
+    console.log("Broadcasting SSE payload:", payload);
+    const event = new ServerSentEvent("update", payload);
+    for (const client of clients) client.dispatchEvent(event);
 }
 
 export default sseRouter;
