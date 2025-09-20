@@ -18,6 +18,6 @@ router
     .post("/decline", auth, decline_invite)
     .post("/cancel", auth, cancel_invite)
     .post("/board", auth, get_board_invites)
-    .get("/my", auth, get_my_invites);
+    .post("/my", auth, get_my_invites);
 
 export default router;

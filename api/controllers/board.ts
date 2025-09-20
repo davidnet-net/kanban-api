@@ -370,3 +370,40 @@ export const get_board_members = async (ctx: Context) => {
     ctx.response.status = 200;
     ctx.response.body = members.map((m: { user_id: number }) => m.user_id);
 };
+
+export const remove_board_member = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const boardId = Number(body.board_id);
+    const memberId = Number(body.member_id);
+
+    if (isNaN(boardId) || boardId <= 0) return ctx.throw(400, "Invalid board id");
+    if (isNaN(memberId) || memberId <= 0) return ctx.throw(400, "Invalid member id");
+
+    const userId = ctx.state.session.userId;
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Get board info
+    const boardResult = await client.query("SELECT owner FROM boards WHERE id = ?", [boardId]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    // Only the owner can remove members
+    if (board.owner !== userId) return ctx.throw(403, "Only the owner can remove members");
+
+    // Owner cannot remove themselves
+    if (memberId === board.owner) return ctx.throw(400, "Owner cannot be removed");
+
+    try {
+        const result = await client.execute(
+            "DELETE FROM board_members WHERE board_id = ? AND user_id = ?",
+            [boardId, memberId]
+        );
+
+        ctx.response.status = 200;
+        ctx.response.body = { ok: true, message: "Member removed successfully" };
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to remove member");
+    }
+};
