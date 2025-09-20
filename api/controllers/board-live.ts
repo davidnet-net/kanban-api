@@ -27,6 +27,7 @@ sseRouter.get("/:boardId", (ctx: RouterContext<"/:boardId">) => {
 export function broadcastBoardUpdate(boardId: string, payload: any) {
   const clients = boardClients.get(boardId);
   if (!clients) return;
+  console.log("Broadcasting SSE payload:", payload);
   const event = new ServerSentEvent("update", payload);
   for (const client of clients) client.dispatchEvent(event);
 }
