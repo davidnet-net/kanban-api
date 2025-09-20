@@ -80,3 +80,23 @@ export const recent_boards = async (ctx: Context) => {
     ctx.response.body = boards;
 };
 
+
+export const shared_with_me = async (ctx: Context) => {
+    const client = await getDBClient();
+    if (!client) {
+        ctx.response.status = 500;
+        ctx.response.body = { error: "Database error" };
+        return;
+    }
+
+    // Find boards where the user is a member but not the owner
+    const rows = await client.query(
+        `SELECT b.*
+         FROM board_members bm
+         JOIN boards b ON bm.board_id = b.id
+         WHERE bm.user_id = ? AND b.owner != ?`,
+        [ctx.state.session.userId, ctx.state.session.userId]
+    );
+
+    ctx.response.body = rows ?? [];
+};
