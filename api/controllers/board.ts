@@ -336,3 +336,37 @@ export const edit_board = async (ctx: Context) => {
         ctx.throw(500, "Failed to update board");
     }
 };
+
+export const get_board_members = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const boardId = Number(body.board_id);
+
+    if (isNaN(boardId) || boardId <= 0) return ctx.throw(400, "Invalid board id");
+
+    const userId = ctx.state.session.userId;
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Get board info
+    const boardResult = await client.query("SELECT owner FROM boards WHERE id = ?", [boardId]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    // Check if requester is owner or member
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [boardId, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    // Get all members except the owner
+    const members = await client.query(
+        "SELECT user_id FROM board_members WHERE board_id = ? AND user_id != ?",
+        [boardId, board.owner]
+    );
+
+    ctx.response.status = 200;
+    ctx.response.body = members.map((m: { user_id: number }) => m.user_id);
+};
