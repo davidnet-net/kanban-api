@@ -19,6 +19,6 @@ router
     .post("/get_board_members", auth, get_board_members)
     .post("/remove_member", auth, remove_board_member)
     .post("/leave", auth, leave_board);
-    router.use("/board/live", sseRouter.routes(), sseRouter.allowedMethods());
+    router.use("/live", sseRouter.routes(), sseRouter.allowedMethods());
 
 export default router;
