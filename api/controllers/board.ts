@@ -395,7 +395,7 @@ export const remove_board_member = async (ctx: Context) => {
     if (memberId === board.owner) return ctx.throw(400, "Owner cannot be removed");
 
     try {
-        const result = await client.execute(
+        const _result = await client.execute(
             "DELETE FROM board_members WHERE board_id = ? AND user_id = ?",
             [boardId, memberId]
         );
@@ -405,5 +405,50 @@ export const remove_board_member = async (ctx: Context) => {
     } catch (err) {
         console.error(err);
         ctx.throw(500, "Failed to remove member");
+    }
+};
+
+// POST /board/leave
+export const leave_board = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const boardId = Number(body.board_id);
+    const userId = ctx.state.session.userId;
+
+    if (isNaN(boardId) || boardId <= 0) {
+        return ctx.throw(400, "Invalid board id");
+    }
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Get board info
+    const boardResult = await client.query(
+        "SELECT owner FROM boards WHERE id = ?",
+        [boardId]
+    );
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    // Owner cannot leave their own board
+    if (board.owner === userId) {
+        return ctx.throw(400, "Owner cannot leave their own board");
+    }
+
+    try {
+        // Remove user from board_members
+        const result = await client.execute(
+            "DELETE FROM board_members WHERE board_id = ? AND user_id = ?",
+            [boardId, userId]
+        );
+
+        if (result.affectedRows === 0) {
+            return ctx.throw(404, "You are not a member of this board");
+        }
+
+        ctx.response.status = 200;
+        ctx.response.body = { ok: true, message: "Successfully left the board" };
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to leave board");
     }
 };
