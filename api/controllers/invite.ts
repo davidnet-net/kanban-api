@@ -134,3 +134,84 @@ export const get_my_invites = async (ctx: Context) => {
         ctx.throw(500, "Failed to get invites");
     }
 };
+
+export const get_board_invites = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const boardId = Number(body.board_id);
+    const userId = ctx.state.session.userId;
+
+    if (isNaN(boardId) || boardId <= 0) return ctx.throw(400, "Invalid board_id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Check if requester is owner/admin
+    const membership = await client.query(
+        "SELECT role FROM board_members WHERE board_id = ? AND user_id = ?",
+        [boardId, userId]
+    );
+    if (membership.length === 0 || !["owner", "admin"].includes(membership[0].role)) {
+        return ctx.throw(403, "Forbidden");
+    }
+
+    try {
+        const invites = await client.query(
+            `SELECT i.id, i.invitee_id, i.status, u.user_id AS invitee_user_id
+             FROM board_invites i
+             JOIN users u ON i.invitee_id = u.id
+             WHERE i.board_id = ?`,
+            [boardId]
+        );
+
+        ctx.response.status = 200;
+        ctx.response.body = invites.map((i: any) => ({
+            invite_id: i.id,
+            invitee_id: i.invitee_id,
+            invitee_user_id: i.invitee_user_id,
+            status: i.status
+        }));
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to get board invites");
+    }
+};
+
+// POST /invite/cancel
+export const cancel_invite = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const inviteId = Number(body.invite_id);
+    const userId = ctx.state.session.userId;
+
+    if (isNaN(inviteId) || inviteId <= 0) return ctx.throw(400, "Invalid invite_id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    const invite = (await client.query(
+        "SELECT * FROM board_invites WHERE id = ?",
+        [inviteId]
+    ))[0];
+    if (!invite) return ctx.throw(404, "Invite not found");
+
+    // Check permissions (inviter or board admin/owner)
+    const membership = await client.query(
+        "SELECT role FROM board_members WHERE board_id = ? AND user_id = ?",
+        [invite.board_id, userId]
+    );
+
+    const isAdminOrOwner =
+        membership.length > 0 && ["owner", "admin"].includes(membership[0].role);
+
+    if (invite.inviter_id !== userId && !isAdminOrOwner) {
+        return ctx.throw(403, "Not allowed to cancel this invite");
+    }
+
+    try {
+        await client.execute("DELETE FROM board_invites WHERE id = ?", [inviteId]);
+        ctx.response.status = 200;
+        ctx.response.body = { ok: true };
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to cancel invite");
+    }
+};

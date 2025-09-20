@@ -4,7 +4,9 @@ import {
     send_invite, 
     accept_invite, 
     decline_invite, 
-    get_my_invites 
+    get_my_invites, 
+	get_board_invites,
+	cancel_invite
 } from "../controllers/invite.ts";
 import auth from "../middlewares/auth.ts";
 
@@ -14,6 +16,8 @@ router
     .post("/send", auth, send_invite)
     .post("/accept", auth, accept_invite)
     .post("/decline", auth, decline_invite)
+    .post("/cancel", auth, cancel_invite)
+    .post("/board", auth, get_board_invites)
     .get("/my", auth, get_my_invites);
 
 export default router;
