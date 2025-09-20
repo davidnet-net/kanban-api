@@ -136,6 +136,21 @@ async function ensureDBStructure(client: Client) {
 			)
 		`);
 
+		await client.execute(`
+			CREATE TABLE IF NOT EXISTS board_invites (
+				id BIGINT PRIMARY KEY AUTO_INCREMENT,
+				board_id BIGINT NOT NULL,
+				inviter_id BIGINT NOT NULL,
+				invitee_id BIGINT NOT NULL,
+				status ENUM('pending', 'accepted', 'declined') DEFAULT 'pending',
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
+				FOREIGN KEY (inviter_id) REFERENCES users(id) ON DELETE CASCADE,
+				FOREIGN KEY (invitee_id) REFERENCES users(id) ON DELETE CASCADE,
+				UNIQUE KEY unique_invite (board_id, invitee_id)
+			)
+		`);
+
 		// board_labels
 		await client.execute(`
 			CREATE TABLE IF NOT EXISTS board_labels (
