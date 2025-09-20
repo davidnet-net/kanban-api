@@ -1,5 +1,6 @@
 import { Context } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import getDBClient from "../lib/db.ts";
+import { broadcastBoardUpdate } from "./board-live.ts";
 
 export const add_card = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
@@ -48,6 +49,12 @@ export const add_card = async (ctx: Context) => {
         const newCard = await client.query("SELECT * FROM cards WHERE id = ?", [insertedId]);
         ctx.response.status = 201;
         ctx.response.body = newCard[0];
+
+        broadcastBoardUpdate(String(list.board_id), {
+            type: "card_update",
+            listId,
+            cards: await client.query("SELECT * FROM cards WHERE list_id = ? ORDER BY position ASC", [listId])
+        });
     } catch (err) {
         console.error(err);
         ctx.throw(500, "Failed to create card");
@@ -108,6 +115,14 @@ export const move_card = async (ctx: Context) => {
         // Return updated card
         const updatedCardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
         ctx.response.body = updatedCardResult[0];
+
+        broadcastBoardUpdate(String(list.board_id), {
+            type: "card_update",
+            newListId,
+            cards: await client.query("SELECT * FROM cards WHERE list_id = ? ORDER BY position ASC", [newListId])
+        });
+
+
     } catch (err) {
         console.error(err);
         ctx.throw(500, "Failed to move card");

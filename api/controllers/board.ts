@@ -43,7 +43,7 @@ export const get_board = async (ctx: Context) => {
         ctx.response.status = 201;
     } catch (err) {
         console.error(err);
-        ctx.throw(500, "Failed to create card");
+        ctx.throw(500, "Failed to create recent");
     }
 
     if (board.is_public) {
