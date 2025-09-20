@@ -27,8 +27,8 @@ export const send_invite = async (ctx: Context) => {
 
     // CCheck if already invited
     const invited = await client.query(
-        "SELECT * FROM board_invites WHERE board_id = ? AND inviter_id = ?",
-        [boardId, inviterId]
+        "SELECT * FROM board_invites WHERE board_id = ? AND invitee_id = ?",
+        [boardId, inviteeId]
     );
     if (invited.length > 0) {
         return ctx.throw(403, "Already invited");
