@@ -25,6 +25,15 @@ export const send_invite = async (ctx: Context) => {
         return ctx.throw(403, "Not allowed to invite");
     }
 
+    // CCheck if already invited
+    const invited = await client.query(
+        "SELECT * FROM board_invites WHERE board_id = ? AND inviter_id = ?",
+        [boardId, inviterId]
+    );
+    if (invited.length > 0) {
+        return ctx.throw(403, "Already invited");
+    }
+
     try {
         await client.execute(
             `INSERT INTO board_invites (board_id, inviter_id, invitee_id) VALUES (?, ?, ?)
