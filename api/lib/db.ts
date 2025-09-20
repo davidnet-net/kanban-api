@@ -130,7 +130,7 @@ async function ensureDBStructure(client: Client) {
 				id BIGINT PRIMARY KEY AUTO_INCREMENT,
 				user_id BIGINT NOT NULL,
 				board_id BIGINT NOT NULL,
-				role ENUM('member', 'admin', 'view' ) NOT NULL,
+				role ENUM('member', 'admin', 'view', 'owner') NOT NULL,
 				FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
 				FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 			)
