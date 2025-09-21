@@ -10,9 +10,9 @@ sseRouter.get("/:boardId", (ctx: RouterContext<"/:boardId">) => {
     if (!boardId) return ctx.throw(400, "Board ID missing");
 
     // Set SSE headers explicitly
-    ctx.response.headers.set("Content-Type", "text/event-stream");
-    ctx.response.headers.set("Cache-Control", "no-cache");
-    ctx.response.headers.set("Connection", "keep-alive");
+    //ctx.response.headers.set("Content-Type", "text/event-stream");
+    //ctx.response.headers.set("Cache-Control", "no-cache");
+    //ctx.response.headers.set("Connection", "keep-alive");
 
     if (!boardClients.has(boardId)) boardClients.set(boardId, new Set());
     const target = ctx.sendEvents();
