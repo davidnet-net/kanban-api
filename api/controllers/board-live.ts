@@ -30,9 +30,14 @@ sseRouter.get("/:boardId", (ctx: RouterContext<"/:boardId">) => {
 export function broadcastBoardUpdate(boardId: string, payload: any) {
     const clients = boardClients.get(boardId);
     if (!clients) return;
-    console.log("Broadcasting SSE payload:", payload);
-    const event = new ServerSentEvent("update", payload);
-    for (const client of clients) client.dispatchEvent(event);
+
+    const data = JSON.stringify(payload);
+    console.log("Broadcasting SSE payload:", data);
+
+    for (const client of clients) {
+        client.dispatchMessage(`event: update\ndata: ${data}\n\n`);
+    }
 }
+
 
 export default sseRouter;
