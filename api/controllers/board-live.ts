@@ -1,43 +1,42 @@
-// controllers/board-live.ts
-import { Router, Context, ServerSentEvent, RouterContext } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { Router, RouterContext } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 
-const boardClients = new Map<string, Set<ReturnType<Context["sendEvents"]>>>();
-export const sseRouter = new Router();
+const boardClients = new Map<string, Set<WebSocket>>();
+export const wsRouter = new Router();
 
 // Client subscribes to a board
-sseRouter.get("/:boardId", (ctx: RouterContext<"/:boardId">) => {
-    const boardId = ctx.params.boardId;
-    if (!boardId) return ctx.throw(400, "Board ID missing");
+wsRouter.get("/:boardId", async (ctx: RouterContext<"/:boardId">) => {
+  const boardId = ctx.params.boardId;
+  if (!boardId) return ctx.throw(400, "Board ID missing");
 
-    // Set SSE headers explicitly
-    //ctx.response.headers.set("Content-Type", "text/event-stream");
-    //ctx.response.headers.set("Cache-Control", "no-cache");
-    //ctx.response.headers.set("Connection", "keep-alive");
+  if (!ctx.isUpgradable) return ctx.throw(400, "WebSocket not supported");
+  const ws = await ctx.upgrade();
 
-    if (!boardClients.has(boardId)) boardClients.set(boardId, new Set());
-    const target = ctx.sendEvents();
-    const clients = boardClients.get(boardId)!;
-    clients.add(target);
+  if (!boardClients.has(boardId)) boardClients.set(boardId, new Set());
+  const clients = boardClients.get(boardId)!;
+  clients.add(ws);
 
-    console.log(`Client connected to board ${boardId}. Total: ${clients.size}`);
+  console.log(`Client connected to board ${boardId}. Total: ${clients.size}`);
 
-    target.addEventListener("close", () => {
-        clients.delete(target);
-        console.log(`Client disconnected from board ${boardId}. Total: ${clients.size}`);
-    });
+  ws.onclose = () => {
+    clients.delete(ws);
+    console.log(`Client disconnected from board ${boardId}. Total: ${clients.size}`);
+  };
+
+  ws.onerror = (err) => {
+    console.error("WebSocket error:", err);
+    clients.delete(ws);
+  };
 });
 
 export function broadcastBoardUpdate(boardId: string, payload: any) {
-    const clients = boardClients.get(boardId);
-    if (!clients) return;
-
-    const data = JSON.stringify(payload);
-    console.log("Broadcasting SSE payload:", data);
-
-    for (const client of clients) {
-        client.dispatchMessage(`event: update\ndata: ${data}\n\n`);
+  const clients = boardClients.get(boardId);
+  if (!clients) return;
+  const message = JSON.stringify(payload);
+  for (const ws of clients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
     }
+  }
 }
 
-
-export default sseRouter;
+export default wsRouter;

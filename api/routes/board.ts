@@ -1,7 +1,7 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { am_i_member, create_board, delete_board, edit_board, favorite_board, get_board, get_board_members, get_lists, is_favorited, leave_board, remove_board_member, unfavorite_board } from "../controllers/board.ts";
 import auth from "../middlewares/auth.ts";
-import sseRouter from "../controllers/board-live.ts";
+import { wsRouter } from "../controllers/board-live.ts";
 
 
 const router = new Router();
@@ -19,6 +19,6 @@ router
     .post("/get_board_members", auth, get_board_members)
     .post("/remove_member", auth, remove_board_member)
     .post("/leave", auth, leave_board);
-    router.use("/live", sseRouter.routes(), sseRouter.allowedMethods());
+    router.use("/live", wsRouter.routes(), wsRouter.allowedMethods());
 
 export default router;
