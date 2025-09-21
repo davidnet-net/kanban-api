@@ -102,6 +102,7 @@ async function ensureDBStructure(client: Client) {
 				id BIGINT PRIMARY KEY AUTO_INCREMENT,
 				list_id BIGINT NOT NULL,
 				name VARCHAR(100) NOT NULL,
+				description TEXT,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				is_archived BOOLEAN DEFAULT FALSE,
 				owner BIGINT NOT NULL,
