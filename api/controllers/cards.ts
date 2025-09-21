@@ -144,7 +144,10 @@ export const update_card_description = async (ctx: Context) => {
 
     const cardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
     const card = cardResult[0];
-    if (!card) return ctx.throw(404, "Card not found");
+    if (!card) {
+        ctx.response.status = 404;
+        ctx.response.body = {error: "Card doesn't exist"}
+    }
 
     // Authorization: owner or board member
     const boardResult = await client.query(
