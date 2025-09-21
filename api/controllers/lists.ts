@@ -1,7 +1,11 @@
 import { Context } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import getDBClient from "../lib/db.ts";
 import { verifyJWT } from "../lib/jwt.ts";
+import { broadcastBoardUpdate } from "./board-live.ts";
 
+/**
+ * Get all cards for a list
+ */
 export const get_cards = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
     const listId = Number(body.list_id);
@@ -39,13 +43,15 @@ export const get_cards = async (ctx: Context) => {
         }
     }
 
-    const cards = await client.query("SELECT * FROM cards WHERE list_id = ? ORDER BY created_at ASC", [listId]);
+    const cards = await client.query(
+        "SELECT * FROM cards WHERE list_id = ? ORDER BY created_at ASC",
+        [listId]
+    );
     ctx.response.body = cards;
 };
 
 /**
  * Adds a new list to a board.
- * Only the board owner or members can add lists.
  */
 export const add_list = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
@@ -58,12 +64,10 @@ export const add_list = async (ctx: Context) => {
     const client = await getDBClient();
     if (!client) return ctx.throw(500, "DB error");
 
-    // Check board existence
     const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [boardId]);
     const board = boardResult[0];
     if (!board) return ctx.throw(404, "Board not found");
 
-    // Authorization: must be owner or member
     const userId = ctx.state.session.userId;
     if (board.owner !== userId) {
         const membership = await client.query(
@@ -73,7 +77,7 @@ export const add_list = async (ctx: Context) => {
         if (membership.length === 0) return ctx.throw(403, "Forbidden");
     }
 
-    // Determine the next position (end of list)
+    // Determine the next position
     const positionResult = await client.query(
         "SELECT MAX(position) as maxPos FROM lists WHERE board_id = ?",
         [boardId]
@@ -81,17 +85,23 @@ export const add_list = async (ctx: Context) => {
     const maxPos = positionResult[0]?.maxPos ?? 0;
     const newPosition = (maxPos ?? 0) + 1;
 
-    // Insert new list
     try {
         const result = await client.execute(
             "INSERT INTO lists (name, position, board_id) VALUES (?, ?, ?)",
             [name, newPosition, boardId]
         );
         const newListId = result.lastInsertId;
-
         const newList = await client.query("SELECT * FROM lists WHERE id = ?", [newListId]);
         ctx.response.status = 201;
         ctx.response.body = newList[0];
+
+        // Broadcast the updated full list array
+        const updatedLists = await client.query("SELECT * FROM lists WHERE board_id = ? ORDER BY position ASC", [boardId]);
+        broadcastBoardUpdate(String(boardId), {
+            type: "list_update",
+            lists: updatedLists
+        });
+
     } catch (err) {
         console.error(err);
         ctx.throw(500, "Failed to create list");
@@ -100,15 +110,6 @@ export const add_list = async (ctx: Context) => {
 
 /**
  * Reorders lists on a board.
- * Expects body:
- * {
- *   board_id: 123,
- *   lists: [
- *     { id: 1, position: 1 },
- *     { id: 3, position: 2 },
- *     { id: 2, position: 3 }
- *   ]
- * }
  */
 export const move_list = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
@@ -121,12 +122,10 @@ export const move_list = async (ctx: Context) => {
     const client = await getDBClient();
     if (!client) return ctx.throw(500, "DB error");
 
-    // Check board existence
     const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [boardId]);
     const board = boardResult[0];
     if (!board) return ctx.throw(404, "Board not found");
 
-    // Authorization: must be owner or member
     const userId = ctx.state.session.userId;
     if (board.owner !== userId) {
         const membership = await client.query(
@@ -137,7 +136,6 @@ export const move_list = async (ctx: Context) => {
     }
 
     try {
-        // Update each list's position
         for (const list of listsToMove) {
             const listId = Number(list.id);
             const pos = Number(list.position);
@@ -151,6 +149,14 @@ export const move_list = async (ctx: Context) => {
 
         ctx.response.status = 200;
         ctx.response.body = { message: "Lists reordered successfully" };
+
+        // Broadcast updated full list array
+        const updatedLists = await client.query("SELECT * FROM lists WHERE board_id = ? ORDER BY position ASC", [boardId]);
+        broadcastBoardUpdate(String(boardId), {
+            type: "list_update",
+            lists: updatedLists
+        });
+
     } catch (err) {
         console.error(err);
         ctx.throw(500, "Failed to reorder lists");
@@ -159,8 +165,6 @@ export const move_list = async (ctx: Context) => {
 
 /**
  * Deletes a list from a board.
- * Only the board owner or members can delete lists.
- * Body: { board_id: number, list_id: number }
  */
 export const delete_list = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
@@ -173,12 +177,10 @@ export const delete_list = async (ctx: Context) => {
     const client = await getDBClient();
     if (!client) return ctx.throw(500, "DB error");
 
-    // Check board existence
     const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [boardId]);
     const board = boardResult[0];
     if (!board) return ctx.throw(404, "Board not found");
 
-    // Authorization: must be owner or member
     const userId = ctx.state.session.userId;
     if (board.owner !== userId) {
         const membership = await client.query(
@@ -188,19 +190,22 @@ export const delete_list = async (ctx: Context) => {
         if (membership.length === 0) return ctx.throw(403, "Forbidden");
     }
 
-    // Check if list belongs to this board
-    const listResult = await client.query("SELECT * FROM lists WHERE id = ? AND board_id = ?", [
-        listId,
-        boardId,
-    ]);
+    const listResult = await client.query("SELECT * FROM lists WHERE id = ? AND board_id = ?", [listId, boardId]);
     const list = listResult[0];
     if (!list) return ctx.throw(404, "List not found in this board");
 
     try {
         await client.execute("DELETE FROM lists WHERE id = ? AND board_id = ?", [listId, boardId]);
-
         ctx.response.status = 200;
         ctx.response.body = { message: "List deleted successfully" };
+
+        // Broadcast updated full list array
+        const updatedLists = await client.query("SELECT * FROM lists WHERE board_id = ? ORDER BY position ASC", [boardId]);
+        broadcastBoardUpdate(String(boardId), {
+            type: "list_update",
+            lists: updatedLists
+        });
+
     } catch (err) {
         console.error(err);
         ctx.throw(500, "Failed to delete list");
