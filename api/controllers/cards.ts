@@ -296,3 +296,43 @@ export const delete_checklist_item = async (ctx: Context) => {
         items: await client.query("SELECT * FROM checklist_item WHERE card_id = ? ORDER BY id ASC", [card.id])
     });
 };
+
+
+export const delete_card = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const boardId = Number(body.board_id);
+    const cardId = Number(body.card_id);
+
+    if (isNaN(boardId) || boardId <= 0) return ctx.throw(400, "Invalid board id");
+    if (isNaN(listId) || listId <= 0) return ctx.throw(400, "Invalid list id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [boardId]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    const userId = ctx.state.session.userId;
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [board.id, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    const cardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
+    const card = cardResult[0];
+    if (!list) return ctx.throw(404, "Card not found in this board");
+
+    try {
+        await client.execute("DELETE FROM cards WHERE id = ?", [listId]);
+        ctx.response.status = 200;
+        ctx.response.body = { message: "Card deleted successfully" };
+
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to delete list");
+    }
+};
