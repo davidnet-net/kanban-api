@@ -146,7 +146,7 @@ export const update_card_description = async (ctx: Context) => {
     const card = cardResult[0];
     if (!card) {
         ctx.response.status = 404;
-        ctx.response.body = {error: "Card doesn't exist"}
+        ctx.response.body = { error: "Card doesn't exist" }
     }
 
     // Authorization: owner or board member
@@ -331,6 +331,10 @@ export const delete_card = async (ctx: Context) => {
         ctx.response.status = 200;
         ctx.response.body = { message: "Card deleted successfully" };
 
+        broadcastBoardUpdate(String(board.id), {
+            type: "card_delete",
+            card_id: cardId
+        });
     } catch (err) {
         console.error(err);
         ctx.throw(500, "Failed to delete list");
