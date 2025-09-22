@@ -8,7 +8,7 @@ const router = new Router();
 router
     .post("/add", auth, add_card)
     .post("/move", auth, move_card)
-    .post("/delete", auth delete_card)
+    .post("/delete", auth, delete_card)
     .post("/change-title", auth, change_card_title)
     .post("/create-checklist", auth, create_checklist_item)
     .post("/delete-checklist", auth, delete_checklist_item)
