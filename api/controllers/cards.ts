@@ -304,7 +304,7 @@ export const delete_card = async (ctx: Context) => {
     const cardId = Number(body.card_id);
 
     if (isNaN(boardId) || boardId <= 0) return ctx.throw(400, "Invalid board id");
-    if (isNaN(listId) || listId <= 0) return ctx.throw(400, "Invalid list id");
+    if (isNaN(cardId) || cardId <= 0) return ctx.throw(400, "Invalid cardId");
 
     const client = await getDBClient();
     if (!client) return ctx.throw(500, "DB error");
@@ -324,10 +324,10 @@ export const delete_card = async (ctx: Context) => {
 
     const cardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
     const card = cardResult[0];
-    if (!list) return ctx.throw(404, "Card not found in this board");
+    if (!card) return ctx.throw(404, "Card not found in this board");
 
     try {
-        await client.execute("DELETE FROM cards WHERE id = ?", [listId]);
+        await client.execute("DELETE FROM cards WHERE id = ?", [cardId]);
         ctx.response.status = 200;
         ctx.response.body = { message: "Card deleted successfully" };
 
