@@ -26,7 +26,8 @@ jobs:
             DEPLOY_PATH="/srv/$REPO_NAME"
 
             echo "Deployment path: $DEPLOY_PATH"
-
+            git config --global --add safe.directory $DEPLOY_PATH
+            
             # If folder does not exist, clone the repo
             if [ ! -d "$DEPLOY_PATH" ]; then
               echo "Folder does not exist, cloning repo..."
