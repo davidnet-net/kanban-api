@@ -46,6 +46,15 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    ports:
+      - "3001:8080"
+    networks:
+      - auth-network
+    depends_on:
+      - db
 
 volumes:
   db_data:
