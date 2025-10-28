@@ -28,6 +28,7 @@ export const favorite_boards = async (ctx: Context) => {
         [ctx.state.session.userId]
     );
 
+    // deno-lint-ignore no-explicit-any
     const boardIds = (favRows ?? []).map((row: any) => row.board_id);
     let boards = [];
 
@@ -62,6 +63,7 @@ export const recent_boards = async (ctx: Context) => {
         [ctx.state.session.userId]
     );
 
+    // deno-lint-ignore no-explicit-any
     const boardIds = (recentRows ?? []).map((row: any) => row.board_id);
     let boards = [];
 
@@ -73,7 +75,9 @@ export const recent_boards = async (ctx: Context) => {
         );
 
         // Preserve the order of boardIds
+        // deno-lint-ignore no-explicit-any
         const boardMap = new Map(rows.map((b: any) => [b.id, b]));
+        // deno-lint-ignore no-explicit-any
         boards = boardIds.map((id: any) => boardMap.get(id));
     }
 
