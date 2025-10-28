@@ -9,6 +9,6 @@ router
     .get("/favorites", auth, favorite_boards)
     .get("/recent", auth, recent_boards)
     .get("/shared_with_me", auth, shared_with_me)
-    .post("/clear_recent_boards", auth, clear_recent_boards);
+    .post("/clear_recent", auth, clear_recent_boards);
 
 export default router;
