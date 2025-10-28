@@ -100,3 +100,20 @@ export const shared_with_me = async (ctx: Context) => {
 
     ctx.response.body = rows ?? [];
 };
+
+export const clear_recent_boards = async (ctx: Context) => {
+    const client = await getDBClient();
+    if (!client) {
+        ctx.response.status = 500;
+        ctx.response.body = { error: "Database error" };
+        return;
+    }
+
+    await client.execute(
+        "DELETE FROM recent_boards WHERE user_id = ?",
+        [ctx.state.session.userId]
+    );
+
+    ctx.response.status = 200;
+    ctx.response.body = { message: "Recent boards cleared" };
+}
