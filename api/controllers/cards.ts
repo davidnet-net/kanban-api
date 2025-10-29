@@ -175,6 +175,49 @@ export const update_card_description = async (ctx: Context) => {
     });
 };
 
+export const update_card_color = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const cardId = Number(body.card_id);
+    const color = body.color?.trim();
+
+    if (isNaN(cardId) || cardId <= 0) return ctx.throw(400, "Invalid card id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    const cardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
+    const card = cardResult[0];
+    if (!card) {
+        ctx.response.status = 404;
+        ctx.response.body = { error: "Card doesn't exist" }
+    }
+
+    // Authorization: owner or board member
+    const boardResult = await client.query(
+        "SELECT * FROM boards WHERE id = (SELECT board_id FROM lists WHERE id = ?)",
+        [card.list_id]
+    );
+    const board = boardResult[0];
+    const userId = ctx.state.session.userId;
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [board.id, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    await client.execute("UPDATE cards SET color = ? WHERE id = ?", [color, cardId]);
+    const updatedCardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
+    ctx.response.body = updatedCardResult[0];
+
+    broadcastBoardUpdate(String(board.id), {
+        type: "card_update",
+        listId: card.list_id,
+        cards: await client.query("SELECT * FROM cards WHERE list_id = ? ORDER BY position ASC", [card.list_id])
+    });
+};
+
 /**
  * 2️⃣ Create a checklist item
  */

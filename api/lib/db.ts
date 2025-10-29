@@ -92,6 +92,7 @@ async function ensureDBStructure(client: Client) {
 				position INT NOT NULL,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				board_id BIGINT NOT NULL,
+				color CHAR(7),
 				FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
 			)
 		`);
@@ -106,6 +107,7 @@ async function ensureDBStructure(client: Client) {
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				is_archived BOOLEAN DEFAULT FALSE,
 				owner BIGINT NOT NULL,
+				color CHAR(7),
 				position INT NOT NULL,
 				FOREIGN KEY (owner) REFERENCES users(user_id) ON DELETE CASCADE,
 				FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
