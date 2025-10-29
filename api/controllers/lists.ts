@@ -163,6 +163,49 @@ export const move_list = async (ctx: Context) => {
     }
 };
 
+export const update_list_color = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const listId = Number(body.list_id);
+    const color = body.color?.trim();
+
+    if (isNaN(listId) || listId <= 0) return ctx.throw(400, "Invalid list id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    const listResult = await client.query("SELECT * FROM lists WHERE id = ?", [listId]);
+    const list = listResult[0];
+    if (!list) return ctx.throw(404, "List not found");
+
+    // Get the board for authorization
+    const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [list.board_id]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    const userId = ctx.state.session.userId;
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [board.id, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    // Update the color
+    await client.execute("UPDATE lists SET color = ? WHERE id = ?", [color, listId]);
+
+    const updatedListResult = await client.query("SELECT * FROM lists WHERE id = ?", [listId]);
+    ctx.response.body = updatedListResult[0];
+
+    // Broadcast updated lists for the board
+    const updatedLists = await client.query("SELECT * FROM lists WHERE board_id = ? ORDER BY position ASC", [board.id]);
+    broadcastBoardUpdate(String(board.id), {
+        type: "list_update",
+        lists: updatedLists
+    });
+};
+
+
 /**
  * Deletes a list from a board.
  */
