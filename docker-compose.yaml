@@ -26,6 +26,8 @@ services:
       DA_LOG_TO_TERMINAL: ${LOG_TO_TERMINAL}
       DA_EMAIL: ${EMAIL}
       DA_EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      DA_RABBITMQ_USER: ${RABBITMQ_USER}
+      DA_RABBITMQ_PASS: ${RABBITMQ_PASS}
     ports:
       - "1001:1001"
     volumes:
