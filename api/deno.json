@@ -3,7 +3,8 @@
 		"run": "deno run --allow-net --allow-read=logs,email_templates --allow-write=logs --allow-env='DA_*,ETHEREAL_*' main.ts"
 	},
 	"imports": {
-		"@std/assert": "jsr:@std/assert@1"
+		"@std/assert": "jsr:@std/assert@1",
+		"amqplib": "npm:amqplib@^0.10.9"
 	},
 	"fmt": {
 		"useTabs": true,
