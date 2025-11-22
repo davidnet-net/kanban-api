@@ -17,7 +17,7 @@ async function isDBHealthy() {
 
 export const health = async (ctx: Context) => {
 	const DatabaseHealthy = await isDBHealthy();
-	const RabbitMQHealthy = getIsRabbitMQConnectionHealthy();
+	const RabbitMQHealthy = await getIsRabbitMQConnectionHealthy();
 
 	// Overall status
 	const allHealthy = DatabaseHealthy && RabbitMQHealthy;
