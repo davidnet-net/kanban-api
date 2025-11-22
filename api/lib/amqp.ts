@@ -21,13 +21,6 @@ let channel: Channel | null = null;
 let isRabbitMQConnectionHealthy = false;
 
 // -------------------------
-// Export health
-// -------------------------
-export function getIsRabbitMQConnectionHealthy(): boolean {
-  return isRabbitMQConnectionHealthy;
-}
-
-// -------------------------
 // Connect & setup channel
 // -------------------------
 async function connectToRabbitMQ(): Promise<Connection> {
@@ -75,16 +68,29 @@ function scheduleReconnect() {
 }
 
 // -------------------------
+// Export health
+// -------------------------
+export async function getIsRabbitMQConnectionHealthy(): Promise<boolean> {
+  if (!isRabbitMQConnectionHealthy) {
+    try {
+      await connectToRabbitMQ();
+    } catch (err) {
+      console.error("[RabbitMQ] Health check failed:", err);
+    }
+  }
+  return isRabbitMQConnectionHealthy;
+}
+
+// -------------------------
 // Public API
 // -------------------------
-
 export async function getRabbitMQConnection(): Promise<Connection> {
   if (connection) return connection;
   return await connectToRabbitMQ();
 }
 
 export async function publish(queueName: string, message: unknown) {
-  if (!channel) await getRabbitMQConnection();
+  if (!channel) await getIsRabbitMQConnectionHealthy();
   if (!channel) throw new Error("RabbitMQ channel not available");
 
   await channel.assertQueue(queueName, { durable: true });
@@ -95,8 +101,12 @@ export async function publish(queueName: string, message: unknown) {
   console.log(`[RabbitMQ] Message published to queue "${queueName}"`);
 }
 
-export async function listen<T>(queueName: string, handler: (msg: T) => void | Promise<void>, noAck = false) {
-  if (!channel) await getRabbitMQConnection();
+export async function listen<T>(
+  queueName: string,
+  handler: (msg: T) => void | Promise<void>,
+  noAck = false
+) {
+  if (!channel) await getIsRabbitMQConnectionHealthy();
   if (!channel) throw new Error("RabbitMQ channel not available");
 
   await channel.assertQueue(queueName, { durable: true });
@@ -117,14 +127,13 @@ export async function listen<T>(queueName: string, handler: (msg: T) => void | P
         }
       }
     },
-    { noAck },
+    { noAck }
   );
 }
 
 // -------------------------
 // Example usage
 // -------------------------
-
 if (import.meta.main) {
   await publish("hello", { hello: "world" });
 
