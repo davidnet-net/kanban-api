@@ -41,6 +41,7 @@ services:
       - db
     networks:
       - kanban-network
+      - rabbitmq-net
     healthcheck:
       test: [
         "CMD-SHELL",
@@ -67,3 +68,5 @@ volumes:
 networks:
   kanban-network:
     driver: bridge
+  rabbitmq-net:
+    external: true
