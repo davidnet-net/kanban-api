@@ -109,6 +109,8 @@ async function ensureDBStructure(client: Client) {
 				owner BIGINT NOT NULL,
 				color CHAR(7),
 				position INT NOT NULL,
+				start_date DATE NULL,
+				due_date DATE NULL,
 				FOREIGN KEY (owner) REFERENCES users(user_id) ON DELETE CASCADE,
 				FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
 			)
