@@ -218,9 +218,6 @@ export const update_card_color = async (ctx: Context) => {
     });
 };
 
-/**
- * 2️⃣ Create a checklist item
- */
 export const create_checklist_item = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
     const cardId = Number(body.card_id);
@@ -247,6 +244,105 @@ export const create_checklist_item = async (ctx: Context) => {
         items: await client.query("SELECT * FROM checklist_item WHERE card_id = ? ORDER BY id ASC", [cardId])
     });
 };
+
+export const get_checklists = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const cardId = Number(body.card_id);
+
+    if (isNaN(cardId) || cardId <= 0) return ctx.throw(400, "Invalid card id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Fetch card
+    const cardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
+    const card = cardResult[0];
+    if (!card) return ctx.throw(404, "Card not found");
+
+    // Authorization: must be owner or board member
+    const boardResult = await client.query(
+        "SELECT * FROM boards WHERE id = (SELECT board_id FROM lists WHERE id = ?)",
+        [card.list_id]
+    );
+    const board = boardResult[0];
+    const userId = ctx.state.session.userId;
+
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [board.id, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    // Fetch checklist items
+    const items = await client.query(
+        "SELECT * FROM checklist_item WHERE card_id = ? ORDER BY id ASC",
+        [cardId]
+    );
+
+    ctx.response.status = 200;
+    ctx.response.body = {
+        cardId,
+        items
+    };
+};
+
+/**
+ * Toggle checklist item completed state
+ */
+export const toggle_checklist_item = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const itemId = Number(body.item_id);
+
+    if (isNaN(itemId) || itemId <= 0) return ctx.throw(400, "Invalid checklist item id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Fetch the checklist item
+    const itemResult = await client.query("SELECT * FROM checklist_item WHERE id = ?", [itemId]);
+    const item = itemResult[0];
+    if (!item) return ctx.throw(404, "Checklist item not found");
+
+    // Fetch the card for authorization
+    const cardResult = await client.query("SELECT * FROM cards WHERE id = ?", [item.card_id]);
+    const card = cardResult[0];
+    if (!card) return ctx.throw(404, "Card not found");
+
+    // Check board authorization
+    const boardResult = await client.query(
+        "SELECT * FROM boards WHERE id = (SELECT board_id FROM lists WHERE id = ?)",
+        [card.list_id]
+    );
+    const board = boardResult[0];
+    const userId = ctx.state.session.userId;
+
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [board.id, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    // Toggle is_checked
+    const newChecked = !item.is_checked;
+    await client.execute("UPDATE checklist_item SET is_checked = ? WHERE id = ?", [newChecked, itemId]);
+
+    // Return updated item
+    const updatedItemResult = await client.query("SELECT * FROM checklist_item WHERE id = ?", [itemId]);
+    ctx.response.status = 200;
+    ctx.response.body = updatedItemResult[0];
+
+    // Broadcast update
+    broadcastBoardUpdate(String(card.list_id), {
+        type: "checklist_update",
+        cardId: card.id,
+        items: await client.query("SELECT * FROM checklist_item WHERE card_id = ? ORDER BY id ASC", [card.id])
+    });
+};
+
 
 /**
  * 3️⃣ Change card title

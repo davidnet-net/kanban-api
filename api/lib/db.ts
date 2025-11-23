@@ -181,7 +181,7 @@ async function ensureDBStructure(client: Client) {
 			CREATE TABLE IF NOT EXISTS checklist_item (
 				id BIGINT PRIMARY KEY AUTO_INCREMENT,
 				card_id BIGINT NOT NULL,
-				name VARCHAR(50) NOT NULL UNIQUE,
+				name VARCHAR(50) NOT NULL,
 				is_checked BOOLEAN DEFAULT FALSE,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
