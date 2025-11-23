@@ -70,6 +70,46 @@ export const get_board = async (ctx: Context) => {
     ctx.response.body = board;
 };
 
+export const set_board_background = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const boardId = Number(body.board_id);
+    const backgroundUrl = body.background_url?.trim();
+
+    if (isNaN(boardId) || boardId <= 0) {
+        return ctx.throw(400, "Invalid board id");
+    }
+
+    if (!backgroundUrl) {
+        return ctx.throw(400, "Background URL is required");
+    }
+
+    const userId = ctx.state.session.userId;
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // Get board and verify ownership
+    const boardResult = await client.query("SELECT owner FROM boards WHERE id = ?", [boardId]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    if (board.owner !== userId) {
+        return ctx.throw(403, "Only the owner can change the background");
+    }
+
+    try {
+        await client.execute(
+            "UPDATE boards SET background_url = ? WHERE id = ?",
+            [backgroundUrl, boardId]
+        );
+
+        ctx.response.status = 200;
+        ctx.response.body = { ok: true, board_id: boardId, background_url: backgroundUrl };
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to update board background");
+    }
+};
+
 export const am_i_member = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
     const id = Number(body.id);
