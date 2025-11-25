@@ -55,7 +55,7 @@ services:
     image: adminer
     restart: unless-stopped
     ports:
-      - "3001:8080"
+      - "25567:8080"
     networks:
       - kanban-network
     depends_on:
