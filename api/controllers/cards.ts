@@ -479,3 +479,66 @@ export const delete_card = async (ctx: Context) => {
         ctx.throw(500, "Failed to delete list");
     }
 };
+
+/**
+ * Change card start and due dates
+ */
+export const change_card_dates = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const cardId = Number(body.card_id);
+
+    // These can be a date string "YYYY-MM-DD" or null
+    const startDate = body.start_date;
+    const dueDate = body.due_date;
+
+    if (isNaN(cardId) || cardId <= 0) return ctx.throw(400, "Invalid card id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // 1. Fetch the card to find the list and board
+    const cardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
+    const card = cardResult[0];
+    if (!card) return ctx.throw(404, "Card not found");
+
+    // 2. Fetch Board for Authorization
+    const boardResult = await client.query(
+        "SELECT * FROM boards WHERE id = (SELECT board_id FROM lists WHERE id = ?)",
+        [card.list_id]
+    );
+    const board = boardResult[0];
+
+    // 3. Authorization: Must be owner or board member
+    const userId = ctx.state.session.userId;
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [board.id, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    try {
+        // 4. Update the dates
+        // passing `null` to the client.execute parameters will set the database column to NULL
+        await client.execute(
+            "UPDATE cards SET start_date = ?, due_date = ? WHERE id = ?",
+            [startDate, dueDate, cardId]
+        );
+
+        // 5. Fetch updated card for response
+        const updatedCardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
+        ctx.response.body = updatedCardResult[0];
+
+        // 6. Broadcast update to websocket clients
+        broadcastBoardUpdate(String(board.id), {
+            type: "card_update",
+            listId: card.list_id,
+            cards: await client.query("SELECT * FROM cards WHERE list_id = ? ORDER BY position ASC", [card.list_id])
+        });
+
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to update dates");
+    }
+};
