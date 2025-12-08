@@ -1,5 +1,5 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
-import { add_card, change_card_title, create_checklist_item, delete_checklist_item, move_card, update_card_description, delete_card, update_card_color, get_checklists, toggle_checklist_item, change_card_dates} from "../controllers/cards.ts";
+import { add_card, change_card_title, create_checklist_item, delete_checklist_item, move_card, update_card_description, delete_card, update_card_color, get_checklists, toggle_checklist_item, change_card_dates, get_cards_due_today} from "../controllers/cards.ts";
 import auth from "../middlewares/auth.ts";
 
 
@@ -17,5 +17,6 @@ router
     .post("/get-checklist", auth, get_checklists)
     .post("/toggle-checklist-item", auth, toggle_checklist_item)
     .post("/change-dates", auth, change_card_dates)
+    .post("/due-today", auth, get_cards_due_today)
 
 export default router;

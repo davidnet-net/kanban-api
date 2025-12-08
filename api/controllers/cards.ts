@@ -542,3 +542,44 @@ export const change_card_dates = async (ctx: Context) => {
         ctx.throw(500, "Failed to update dates");
     }
 };
+
+/**
+ * Get all cards assigned to lists/boards the user has access to
+ * that are due exactly today.
+ */
+export const get_cards_due_today = async (ctx: Context) => {
+    // Assuming this is a GET request, so we rely on session, not body
+    const userId = ctx.state.session.userId;
+
+    if (!userId) return ctx.throw(401, "Unauthorized");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    try {
+        // We join lists and boards to check permissions.
+        // We select the card details, plus the board and list name for context in the UI.
+        const cards = await client.query(`
+            SELECT 
+                c.*, 
+                b.name as board_name, 
+                b.id as board_id,
+                l.name as list_name 
+            FROM cards c
+            INNER JOIN lists l ON c.list_id = l.id
+            INNER JOIN boards b ON l.board_id = b.id
+            LEFT JOIN board_members bm ON b.id = bm.board_id AND bm.user_id = ?
+            WHERE 
+                c.due_date = CURDATE() 
+                AND c.is_archived = FALSE
+                AND (b.owner = ? OR bm.user_id IS NOT NULL)
+        `, [userId, userId]);
+
+        ctx.response.status = 200;
+        ctx.response.body = cards;
+
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to fetch due cards");
+    }
+};
