@@ -1,6 +1,7 @@
 import { Context } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import getDBClient from "../lib/db.ts";
 import { broadcastBoardUpdate } from "./board-live.ts";
+import { verifyJWT } from "../lib/jwt.ts";
 
 export const add_card = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
