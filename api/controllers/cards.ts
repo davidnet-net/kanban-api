@@ -640,3 +640,129 @@ export const get_card = async (ctx: Context) => {
     ctx.response.status = 200;
     ctx.response.body = card;
 };
+
+export const create_comment = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const cardId = Number(body.card_id);
+    const commentText = body.comment?.trim();
+
+    if (isNaN(cardId) || cardId <= 0) return ctx.throw(400, "Invalid card id");
+    if (!commentText) return ctx.throw(400, "Comment cannot be empty");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // 1. Fetch the card to find the list
+    const cardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
+    const card = cardResult[0];
+    if (!card) return ctx.throw(404, "Card not found");
+
+    // 2. Fetch the list to find the board
+    const listResult = await client.query("SELECT board_id FROM lists WHERE id = ?", [card.list_id]);
+    const list = listResult[0];
+    if (!list) return ctx.throw(404, "List not found");
+
+    // 3. Fetch Board for Authorization
+    const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [list.board_id]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    // 4. Authorization: Must be owner or board member
+    const userId = ctx.state.session.userId;
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [board.id, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    try {
+        // 5. Insert the comment
+        const result = await client.execute(
+            "INSERT INTO comments (card_id, user_id, comment) VALUES (?, ?, ?)",
+            [cardId, userId, commentText]
+        );
+        const insertedId = result.lastInsertId;
+
+        // 6. Fetch the newly created comment
+        // Note: You might want to JOIN with the 'users' table here to get the username/avatar
+        // e.g., SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id = u.user_id ...
+        const newCommentResult = await client.query(
+            "SELECT * FROM comments WHERE id = ?", 
+            [insertedId]
+        );
+        const newComment = newCommentResult[0];
+
+        ctx.response.status = 201;
+        ctx.response.body = newComment;
+
+        // 7. Broadcast update
+        broadcastBoardUpdate(String(board.id), {
+            type: "comment_update",
+            cardId: cardId,
+            comment: newComment
+        });
+
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to create comment");
+    }
+};
+
+export const get_comments = async (ctx: Context) => {
+    // Assuming this is a POST to pass card_id in body, 
+    // or you can change to ctx.request.url.searchParams for a GET request.
+    const body = await ctx.request.body({ type: "json" }).value;
+    const cardId = Number(body.card_id);
+
+    if (isNaN(cardId) || cardId <= 0) return ctx.throw(400, "Invalid card id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // 1. Fetch card to find connection to board
+    const cardResult = await client.query("SELECT list_id FROM cards WHERE id = ?", [cardId]);
+    const card = cardResult[0];
+    if (!card) return ctx.throw(404, "Card not found");
+
+    // 2. Fetch list to find board
+    const listResult = await client.query("SELECT board_id FROM lists WHERE id = ?", [card.list_id]);
+    const list = listResult[0];
+    if (!list) return ctx.throw(404, "List not found");
+
+    // 3. Fetch board for Authorization
+    const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [list.board_id]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    // 4. Authorization
+    // If the board is public, we might skip the check, but assuming standard logic:
+    const userId = ctx.state.session.userId;
+    if (board.owner !== userId) {
+        const membership = await client.query(
+            "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+            [board.id, userId]
+        );
+        if (membership.length === 0) return ctx.throw(403, "Forbidden");
+    }
+
+    try {
+        // 5. Fetch comments
+        // Optional: JOIN users ON comments.user_id = users.user_id to get author names
+        const comments = await client.query(
+            "SELECT * FROM comments WHERE card_id = ? ORDER BY created_at ASC",
+            [cardId]
+        );
+
+        ctx.response.status = 200;
+        ctx.response.body = {
+            card_id: cardId,
+            comments: comments
+        };
+
+    } catch (err) {
+        console.error(err);
+        ctx.throw(500, "Failed to fetch comments");
+    }
+};
