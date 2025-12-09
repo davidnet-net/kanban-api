@@ -17,6 +17,6 @@ router
     .post("/get-checklist", auth, get_checklists)
     .post("/toggle-checklist-item", auth, toggle_checklist_item)
     .post("/change-dates", auth, change_card_dates)
-    .post("/due-today", auth, get_cards_due_today)
+    .get("/due-today", auth, get_cards_due_today)
 
 export default router;
