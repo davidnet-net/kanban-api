@@ -583,3 +583,59 @@ export const get_cards_due_today = async (ctx: Context) => {
         ctx.throw(500, "Failed to fetch due cards");
     }
 };
+
+/**
+ * Get a single card by ID
+ */
+export const get_card = async (ctx: Context) => {
+    const body = await ctx.request.body({ type: "json" }).value;
+    const cardId = Number(body.card_id);
+
+    if (isNaN(cardId) || cardId <= 0) return ctx.throw(400, "Invalid card id");
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // 1. Fetch the card
+    const cardResult = await client.query("SELECT * FROM cards WHERE id = ?", [cardId]);
+    const card = cardResult[0];
+    if (!card) return ctx.throw(404, "Card not found");
+
+    // 2. Fetch the list to find the board
+    const listResult = await client.query("SELECT board_id FROM lists WHERE id = ?", [card.list_id]);
+    const list = listResult[0];
+    if (!list) return ctx.throw(404, "List not found for this card");
+
+    // 3. Fetch the board to check permissions
+    const boardResult = await client.query("SELECT * FROM boards WHERE id = ?", [list.board_id]);
+    const board = boardResult[0];
+    if (!board) return ctx.throw(404, "Board not found");
+
+    // 4. Authorization
+    if (!board.is_public) {
+        const authHeader = ctx.request.headers.get("authorization");
+        if (!authHeader?.startsWith("Bearer ")) return ctx.throw(401, "Unauthorized");
+
+        let payload;
+        try {
+            payload = await verifyJWT(authHeader.slice(7));
+        } catch {
+            return ctx.throw(401, "Invalid token");
+        }
+
+        const userId = payload.userId;
+        
+        // Check if owner or member
+        if (board.owner !== userId) {
+            const membership = await client.query(
+                "SELECT id FROM board_members WHERE board_id = ? AND user_id = ?",
+                [board.id, userId]
+            );
+            if (membership.length === 0) return ctx.throw(403, "Forbidden");
+        }
+    }
+
+    // 5. Return the card
+    ctx.response.status = 200;
+    ctx.response.body = card;
+};
