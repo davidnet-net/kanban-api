@@ -2,6 +2,7 @@ import { Context } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import getDBClient from "../lib/db.ts";
 import { broadcastBoardUpdate } from "./board-live.ts";
 import { verifyJWT } from "../lib/jwt.ts";
+import { broadcastCardUpdate } from "./card-live.ts";
 
 export const add_card = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
@@ -122,7 +123,9 @@ export const move_card = async (ctx: Context) => {
             newListId,
             cards: await client.query("SELECT * FROM cards WHERE list_id = ? ORDER BY position ASC", [newListId])
         });
-
+        broadcastCardUpdate(String(cardId), {
+            type: "update_card"
+        });
 
     } catch (err) {
         console.error(err);
@@ -174,6 +177,9 @@ export const update_card_description = async (ctx: Context) => {
         listId: card.list_id,
         cards: await client.query("SELECT * FROM cards WHERE list_id = ? ORDER BY position ASC", [card.list_id])
     });
+    broadcastBoardUpdate(String(cardId), {
+        type: "update_card"
+    });
 };
 
 export const update_card_color = async (ctx: Context) => {
@@ -217,6 +223,9 @@ export const update_card_color = async (ctx: Context) => {
         listId: card.list_id,
         cards: await client.query("SELECT * FROM cards WHERE list_id = ? ORDER BY position ASC", [card.list_id])
     });
+    broadcastBoardUpdate(String(cardId), {
+        type: "update_card"
+    });
 };
 
 export const create_checklist_item = async (ctx: Context) => {
@@ -243,6 +252,9 @@ export const create_checklist_item = async (ctx: Context) => {
         type: "checklist_update",
         cardId,
         items: await client.query("SELECT * FROM checklist_item WHERE card_id = ? ORDER BY id ASC", [cardId])
+    });
+    broadcastBoardUpdate(String(cardId), {
+        type: "update_card"
     });
 };
 
@@ -342,6 +354,9 @@ export const toggle_checklist_item = async (ctx: Context) => {
         cardId: card.id,
         items: await client.query("SELECT * FROM checklist_item WHERE card_id = ? ORDER BY id ASC", [card.id])
     });
+    broadcastCardUpdate(String(card.id), {
+        type: "update_card"
+    });
 };
 
 
@@ -386,6 +401,9 @@ export const change_card_title = async (ctx: Context) => {
         type: "card_update",
         listId: card.list_id,
         cards: await client.query("SELECT * FROM cards WHERE list_id = ? ORDER BY position ASC", [card.list_id])
+    });
+    broadcastBoardUpdate(String(cardId), {
+        type: "update_card"
     });
 };
 
@@ -625,7 +643,7 @@ export const get_card = async (ctx: Context) => {
         }
 
         const userId = payload.userId;
-        
+
         // Check if owner or member
         if (board.owner !== userId) {
             const membership = await client.query(
@@ -689,7 +707,7 @@ export const create_comment = async (ctx: Context) => {
         // Note: You might want to JOIN with the 'users' table here to get the username/avatar
         // e.g., SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id = u.user_id ...
         const newCommentResult = await client.query(
-            "SELECT * FROM comments WHERE id = ?", 
+            "SELECT * FROM comments WHERE id = ?",
             [insertedId]
         );
         const newComment = newCommentResult[0];
@@ -698,12 +716,9 @@ export const create_comment = async (ctx: Context) => {
         ctx.response.body = newComment;
 
         // 7. Broadcast update
-        broadcastBoardUpdate(String(board.id), {
-            type: "comment_update",
-            cardId: cardId,
-            comment: newComment
+        broadcastCardUpdate(String(cardId), {
+            type: "update_card"
         });
-
     } catch (err) {
         console.error(err);
         ctx.throw(500, "Failed to create comment");

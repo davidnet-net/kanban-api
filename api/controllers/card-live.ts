@@ -1,25 +1,25 @@
 import { Router, RouterContext } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 
-const boardClients = new Map<string, Set<WebSocket>>();
+const cardClients = new Map<string, Set<WebSocket>>();
 export const wsRouter = new Router();
 
-// Client subscribes to a board
-wsRouter.get("/:boardId", async (ctx: RouterContext<"/:boardId">) => {
-  const boardId = ctx.params.boardId;
-  if (!boardId) return ctx.throw(400, "Board ID missing");
+// Client subscribes to a card
+wsRouter.get("/:cardId", async (ctx: RouterContext<"/:cardId">) => {
+  const cardId = ctx.params.cardId;
+  if (!cardId) return ctx.throw(400, "Card ID missing");
 
   if (!ctx.isUpgradable) return ctx.throw(400, "WebSocket not supported");
   const ws = await ctx.upgrade();
 
-  if (!boardClients.has(boardId)) boardClients.set(boardId, new Set());
-  const clients = boardClients.get(boardId)!;
+  if (!cardClients.has(cardId)) cardClients.set(cardId, new Set());
+  const clients = cardClients.get(cardId)!;
   clients.add(ws);
 
-  console.log(`Client connected to board ${boardId}. Total: ${clients.size}`);
+  console.log(`Client connected to card ${cardId}. Total: ${clients.size}`);
 
   ws.onclose = () => {
     clients.delete(ws);
-    console.log(`Client disconnected from board ${boardId}. Total: ${clients.size}`);
+    console.log(`Client disconnected from card ${cardId}. Total: ${clients.size}`);
   };
 
   // deno-lint-ignore no-explicit-any
@@ -30,8 +30,8 @@ wsRouter.get("/:boardId", async (ctx: RouterContext<"/:boardId">) => {
 });
 
 // deno-lint-ignore no-explicit-any
-export function broadcastBoardUpdate(boardId: string, payload: any) {
-  const clients = boardClients.get(boardId);
+export function broadcastCardUpdate(cardId: string, payload: any) {
+  const clients = cardClients.get(cardId);
   if (!clients) return;
   const message = JSON.stringify(payload);
   for (const ws of clients) {
