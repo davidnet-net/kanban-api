@@ -1,6 +1,7 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { add_card, change_card_title, create_checklist_item, delete_checklist_item, move_card, update_card_description, delete_card, update_card_color, get_checklists, toggle_checklist_item, change_card_dates, get_cards_due_today, get_card, get_comments, create_comment} from "../controllers/cards.ts";
 import auth from "../middlewares/auth.ts";
+import wsRouter from "../controllers/card-live.ts";
 
 
 const router = new Router();
@@ -21,5 +22,6 @@ router
     .post("/get", auth, get_card)
     .post("/get-comments", auth, get_comments)
     .post("/create-comment", auth, create_comment)
+    router.use("/live", wsRouter.routes(), wsRouter.allowedMethods());
 
 export default router;
