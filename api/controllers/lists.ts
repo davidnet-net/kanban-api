@@ -43,10 +43,21 @@ export const get_cards = async (ctx: Context) => {
         }
     }
 
-    const cards = await client.query(
+    const cardsold = await client.query(
         "SELECT * FROM cards WHERE list_id = ? ORDER BY created_at ASC",
         [listId]
     );
+    const placeholderLabel = {
+        id: 1,
+        name: "placeholder",
+        color: "red"
+    };
+
+    const cards = cardsold.map(card => ({
+        ...card,               // Kopieer alle bestaande data van de kaart (id, title, etc.)
+        labels: placeholderLabel // Voeg de nieuwe 'labels' key toe
+    }));
+
     ctx.response.body = cards;
 };
 
