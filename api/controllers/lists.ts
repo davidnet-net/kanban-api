@@ -55,7 +55,7 @@ export const get_cards = async (ctx: Context) => {
 
     const cards = cardsold.map(card => ({
         ...card,               // Kopieer alle bestaande data van de kaart (id, title, etc.)
-        labels: placeholderLabel // Voeg de nieuwe 'labels' key toe
+        labels: [placeholderLabel] // Voeg de nieuwe 'labels' key toe
     }));
 
     ctx.response.body = cards;
