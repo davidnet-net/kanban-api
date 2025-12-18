@@ -175,7 +175,6 @@ async function ensureDBStructure(client: Client) {
 				card_id BIGINT NOT NULL,
 				label_id BIGINT NOT NULL,
 				FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE,
-				FOREIGN KEY (label_id) REFERENCES board_labels(id) ON DELETE CASCADE
 			)
 		`);
 
@@ -220,6 +219,16 @@ async function ensureDBStructure(client: Client) {
 				user_id BIGINT NOT NULL,
 				board_id BIGINT NOT NULL,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+			)
+		`);
+
+		//  ics
+		await client.execute(`
+			CREATE TABLE IF NOT EXISTS calendar_ics (
+				id BIGINT PRIMARY KEY AUTO_INCREMENT,
+				board_id BIGINT NOT NULL,
 				FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
 				FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 			)
