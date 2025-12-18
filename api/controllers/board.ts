@@ -260,6 +260,72 @@ export const am_i_member = async (ctx: Context) => {
     ctx.response.body = { result: membershipResult.length > 0 };
 };
 
+export const get_board_ics_entries = async (ctx: Context) => {
+    // 1. Parse Parameters
+    // @ts-ignore: params exists on context when using router
+    const boardId = Number(ctx.params.id);
+    
+    if (isNaN(boardId) || boardId <= 0) {
+        return ctx.throw(400, "Invalid board id");
+    }
+
+    // Since 'auth' middleware is used, we expect session data
+    // @ts-ignore
+    const userId = ctx.state.session?.userId;
+    if (!userId) {
+        return ctx.throw(401, "Unauthorized");
+    }
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // 2. Authorization Check (Owner or Member)
+    // First, get the board owner to check ownership
+    const boardResult = await client.query(
+        "SELECT owner FROM boards WHERE id = ?", 
+        [boardId]
+    );
+    const board = boardResult[0];
+
+    if (!board) {
+        return ctx.throw(404, "Board not found");
+    }
+
+    let isAuthorized = false;
+
+    // A: Is the user the Owner?
+    if (board.owner === userId) {
+        isAuthorized = true;
+    } else {
+        // B: Is the user a Member?
+        const memberResult = await client.query(
+            "SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ?",
+            [boardId, userId]
+        );
+        if (memberResult.length > 0) {
+            isAuthorized = true;
+        }
+    }
+
+    if (!isAuthorized) {
+        return ctx.throw(403, "You are not a member of this board");
+    }
+
+    // 3. Fetch ICS Entries
+    try {
+        const entries = await client.query(
+            "SELECT * FROM calendar_ics WHERE board_id = ?",
+            [boardId]
+        );
+
+        ctx.response.status = 200;
+        ctx.response.body = entries;
+    } catch (err) {
+        console.error("Error fetching calendar entries:", err);
+        ctx.throw(500, "Failed to retrieve calendar entries");
+    }
+};
+
 export const create_board = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
     const name = body.name?.trim();
