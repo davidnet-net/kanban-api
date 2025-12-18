@@ -2,6 +2,120 @@ import { Context } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { getDBClient } from "../lib/db.ts";
 import { verifyJWT } from "../lib/jwt.ts";
 
+// Helper functie om JS Date naar ICS datum formaat te zetten (YYYYMMDD)
+const formatICSDate = (date: Date): string => {
+    return date.toISOString().split('T')[0].replace(/-/g, '');
+};
+
+// Helper om datum met 1 dag te verhogen (nodig voor ICS exclusive end date)
+const addDay = (date: Date): Date => {
+    const result = new Date(date);
+    result.setDate(result.getDate() + 1);
+    return result;
+};
+
+export const get_board_ics = async (ctx: Context) => {
+    // 1. Haal parameters op (werkt met router path: /board/ics/:id/:token)
+    // @ts-ignore: params exists on context when using router
+    const boardId = Number(ctx.params.id); 
+    // @ts-ignore
+    const token = ctx.params.token;
+
+    if (isNaN(boardId) || !token) {
+        return ctx.throw(400, "Invalid request parameters");
+    }
+
+    const client = await getDBClient();
+    if (!client) return ctx.throw(500, "DB error");
+
+    // 2. Valideer Bord & Token (Geen Auth Header nodig, token is de sleutel)
+    const boardResult = await client.query(
+        "SELECT name, calendar_ics_token FROM boards WHERE id = ?", 
+        [boardId]
+    );
+    const board = boardResult[0];
+
+    if (!board) {
+        return ctx.throw(404, "Board not found");
+    }
+
+    // Veiligheidscheck: Token moet matchen
+    if (board.calendar_ics_token !== token) {
+        return ctx.throw(401, "Invalid calendar token");
+    }
+
+    // 3. Haal Cards op (Cards -> Lists -> Board)
+    // We pakken alleen kaarten die niet gearchiveerd zijn EN minstens één datum hebben
+    const cards = await client.query(`
+        SELECT c.id, c.name, c.description, c.start_date, c.due_date 
+        FROM cards c
+        JOIN lists l ON c.list_id = l.id
+        WHERE l.board_id = ? 
+        AND c.is_archived = FALSE
+        AND (c.start_date IS NOT NULL OR c.due_date IS NOT NULL)
+    `, [boardId]);
+
+    // 4. Bouw de ICS String
+    let icsContent = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "kanban.davidnet.net:-//Davidnet//KanbanCalendar//EN",
+        `X-WR-CALNAME:${board.name}`,
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH"
+    ];
+
+    for (const card of cards) {
+        const now = formatICSDate(new Date()) + "T120000Z"; // Timestamp voor DTSTAMP
+        
+        let dtStart: string;
+        let dtEnd: string;
+
+        // Datum Logica
+        if (card.start_date && card.due_date) {
+            // Van X tot Y
+            dtStart = formatICSDate(card.start_date);
+            // End date is exclusief in ICS, dus we tellen er 1 dag bij op
+            dtEnd = formatICSDate(addDay(card.due_date));
+        } else if (card.start_date) {
+            // Alleen startdatum -> Hele dag event op startdatum
+            dtStart = formatICSDate(card.start_date);
+            dtEnd = formatICSDate(addDay(card.start_date));
+        } else {
+            // Alleen due date -> Hele dag event op due date
+            dtStart = formatICSDate(card.due_date);
+            dtEnd = formatICSDate(addDay(card.due_date));
+        }
+
+        // Description opschonen (newlines vervangen door \n voor ICS)
+        const description = card.description 
+            ? card.description.replace(/\n/g, "\\n").replace(/,/g, "\\,") 
+            : "";
+        
+        const summary = card.name.replace(/,/g, "\\,");
+
+        icsContent.push(
+            "BEGIN:VEVENT",
+            `UID:card-${card.id}@kanban.davidnet.net`,
+            `DTSTAMP:${now}`,
+            `DTSTART;VALUE=DATE:${dtStart}`,
+            `DTEND;VALUE=DATE:${dtEnd}`,
+            `SUMMARY:${summary}`,
+            `DESCRIPTION:${description}`,
+            "END:VEVENT"
+        );
+    }
+
+    icsContent.push("END:VCALENDAR");
+
+    // 5. Stuur response
+    ctx.response.status = 200;
+    // Belangrijk: Juiste header zodat agenda apps (Google Calendar, Outlook) het snappen
+    ctx.response.headers.set("Content-Type", "text/calendar; charset=utf-8");
+    ctx.response.headers.set("Content-Disposition", `attachment; filename="${board.name}.ics"`);
+    ctx.response.body = icsContent.join("\r\n");
+};
+
 export const get_board = async (ctx: Context) => {
     const body = await ctx.request.body({ type: "json" }).value;
     const id = Number(body.id);
@@ -160,8 +274,8 @@ export const create_board = async (ctx: Context) => {
 
     try {
         const result = await client.execute(
-            "INSERT INTO boards (name, owner, is_public, background_url) VALUES (?, ?, ?, ?)",
-            [name, userId, isPublic ? 1 : 0, backgroundUrl]
+            "INSERT INTO boards (name, owner, is_public, background_url, calendar_ics_token) VALUES (?, ?, ?, ?, ?)",
+            [name, userId, isPublic ? 1 : 0, backgroundUrl, crypto.randomUUID()]
         );
 
         const newBoardId = result.lastInsertId;

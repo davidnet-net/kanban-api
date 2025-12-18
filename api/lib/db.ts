@@ -77,6 +77,7 @@ async function ensureDBStructure(client: Client) {
 				id BIGINT PRIMARY KEY AUTO_INCREMENT,
 				name VARCHAR(20) NOT NULL,
 				owner BIGINT NOT NULL,
+				calendar_ics_token CHAR(64) NOT NULL,
 				is_public BOOLEAN DEFAULT FALSE,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				background_url VARCHAR(2048) NOT NULL,
