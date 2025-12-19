@@ -231,7 +231,6 @@ async function ensureDBStructure(client: Client) {
 				id BIGINT PRIMARY KEY AUTO_INCREMENT,
 				board_id BIGINT NOT NULL,
 				FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
-				FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 			)
 		`);
 
